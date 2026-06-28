@@ -1,0 +1,27 @@
+# Replit configuration — lets you import this GitHub repo and click "Run".
+# Docs: https://docs.replit.com/programming-ide/configuring-repl
+
+# Install deps on first run (Replit caches node_modules afterward), then start.
+run = "npm install && npm start"
+entrypoint = "server.js"
+modules = ["nodejs-20"]
+
+# The app reads process.env.PORT (Replit provides one) and binds 0.0.0.0,
+# so the webview just works. We map the app's default port to external 80.
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+# One-click Deploy (Reserved VM / Autoscale both work for a plain Node server).
+[deployment]
+run = ["sh", "-c", "npm start"]
+deploymentTarget = "autoscale"
+build = ["sh", "-c", "npm install"]
+
+[nix]
+channel = "stable-24_05"
+
+# How to enable the free managed AI agent on Replit WITHOUT committing a key:
+# open the Secrets tab (lock icon) and add a secret named SERVER_AI_KEY with a
+# free Google Gemini key (AIza...). Leave it unset to run in bring-your-own-key
+# mode, where each visitor pastes their own key. See README "Run on Replit".

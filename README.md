@@ -51,6 +51,20 @@ npm start
 Open http://localhost:3000 for the landing page, or
 http://localhost:3000/app.html for the builder.
 
+## Run on Replit
+
+This repo ships with a `.replit` config, so it imports and runs with no setup:
+
+1. In Replit: **Create Repl → Import from GitHub** and paste this repo's URL.
+2. Click **Run**. The config installs dependencies and starts the server; the
+   webview opens the landing page (add `/app.html` for the builder).
+3. *(Optional)* To enable the **free managed AI agent** without committing a key,
+   open the **Secrets** tab (lock icon) and add a secret named `SERVER_AI_KEY`
+   with a free Google Gemini key (`AIza…`). Add the billing/monetization vars
+   (see the table below) as Secrets too if you want them. Leave `SERVER_AI_KEY`
+   unset to run in bring-your-own-key mode.
+4. Use **Deploy** for a public URL (Autoscale or Reserved VM both work).
+
 ## AI keys, the free agent, and credits
 
 There are two ways the agent can be powered:
