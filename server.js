@@ -17,33 +17,87 @@ const PORT = process.env.PORT || 3000;
 const MODEL = process.env.MODEL || 'claude-sonnet-4-6';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
-// ---- Free managed AI agent (optional) -------------------------------------
-// If you set SERVER_AI_KEY, the app offers a "free agent" that uses YOUR key,
-// metered against a per-visitor free token allowance. Once a visitor passes
-// FREE_TOKEN_QUOTA, the agent is paywalled (HTTP 402) and they must upgrade
-// (Stripe payment links below) or paste their own key for unlimited use.
+// ---- Free managed AI agent + usage-based billing (optional) ----------------
+// If you set SERVER_AI_KEY, the app offers a managed agent that uses YOUR key.
 //
-// A free, strong default: get a Google Gemini key (AIza…) — its free tier is
-// permanently free — and set it as SERVER_AI_KEY. The app then works with no
-// key prompt for visitors until they exhaust the allowance.
+// The billing model is monthly, usage-based:
+//   • Every visitor starts on the FREE plan with a monthly token allowance.
+//   • When the FREE allowance is spent, the agent is paywalled (HTTP 402) and
+//     they must pick a paid plan (Stripe links) or paste their own key.
+//   • Each PAID plan INCLUDES a larger monthly token allowance. If a paid user
+//     goes OVER their included amount, they keep building and are billed for
+//     the OVERAGE — only for how much they went over, at $/1,000 tokens.
+//   • Allowances RESET every calendar month.
 //
-// NOTE: usage is tracked IN MEMORY (resets on restart) and is per anonymous
-// browser id, so it's a demo-grade meter, not hardened billing. For production
-// move the counter + payment verification to a database and verify Stripe
-// webhooks. Payments and domain purchases are wired as configurable links;
-// plug in your own Stripe + registrar accounts via the env vars below.
+// A free, strong default: a Google Gemini key (AIza…) has a permanently free
+// tier — set it as SERVER_AI_KEY and the managed agent costs you nothing.
+//
+// NOTE: usage + plan assignment are tracked IN MEMORY (reset on restart) and
+// keyed by an anonymous browser id — demo-grade metering, not hardened billing.
+// For production, persist usage in a database, set the plan from a verified
+// Stripe webhook, and report overage to Stripe metered billing.
 const SERVER_AI_KEY = (process.env.SERVER_AI_KEY || '').trim();
-const FREE_TOKEN_QUOTA = parseInt(process.env.FREE_TOKEN_QUOTA || '100000', 10);
 const STRIPE_PRO_LINK = process.env.STRIPE_PRO_LINK || '';
 const STRIPE_STUDIO_LINK = process.env.STRIPE_STUDIO_LINK || '';
 const COURSE_LINK = process.env.COURSE_LINK || '';
 const MARKETING_LINK = process.env.MARKETING_LINK || '';
 const DOMAIN_SEARCH_LINK = process.env.DOMAIN_SEARCH_LINK || '';
 
-// Per-visitor token tally for the free managed agent. Map<clientId, tokens>.
-const usage = new Map();
-function getUsage(id) { return usage.get(id) || 0; }
-function addUsage(id, tokens) { if (id && tokens > 0) usage.set(id, getUsage(id) + tokens); }
+// Plans: each has an included monthly token allowance, a monthly price, and an
+// overage rate ($ per 1,000 tokens over the included amount). The FREE plan has
+// no overage — it hard-stops and must upgrade. All tunable via env.
+const PLANS = {
+  free: {
+    id: 'free', name: 'Free', price: 0,
+    monthlyTokens: parseInt(process.env.FREE_TOKEN_QUOTA || '100000', 10),
+    overagePer1k: 0, allowOverage: false,
+    link: '',
+  },
+  pro: {
+    id: 'pro', name: 'Pro', price: 12,
+    monthlyTokens: parseInt(process.env.PRO_TOKENS || '2000000', 10),
+    overagePer1k: parseFloat(process.env.PRO_OVERAGE_PER_1K || '0.002'),
+    allowOverage: true,
+    link: STRIPE_PRO_LINK,
+  },
+  studio: {
+    id: 'studio', name: 'Studio', price: 39,
+    monthlyTokens: parseInt(process.env.STUDIO_TOKENS || '10000000', 10),
+    overagePer1k: parseFloat(process.env.STUDIO_OVERAGE_PER_1K || '0.0015'),
+    allowOverage: true,
+    link: STRIPE_STUDIO_LINK,
+  },
+};
+
+// Per-visitor token tally, scoped to the current month so it resets monthly.
+const usage = new Map();        // `${clientId}|${YYYY-MM}` -> tokens used
+const planOf = new Map();       // clientId -> plan id (set on payment)
+function currentPeriod() { return new Date().toISOString().slice(0, 7); } // YYYY-MM
+function usageKey(id) { return `${id}|${currentPeriod()}`; }
+function getUsage(id) { return usage.get(usageKey(id)) || 0; }
+function addUsage(id, tokens) { if (id && tokens > 0) usage.set(usageKey(id), getUsage(id) + tokens); }
+function getPlan(id) { return PLANS[planOf.get(id)] || PLANS.free; }
+
+// A full billing snapshot for a visitor this month.
+function usageSummary(id) {
+  const plan = getPlan(id);
+  const used = getUsage(id);
+  const included = plan.monthlyTokens;
+  const overageTokens = Math.max(0, used - included);
+  const overageCost = +(overageTokens / 1000 * plan.overagePer1k).toFixed(2);
+  return {
+    plan: plan.id,
+    planName: plan.name,
+    used,
+    included,
+    remaining: Math.max(0, included - used),
+    allowOverage: plan.allowOverage,
+    overageTokens,
+    overagePer1k: plan.overagePer1k,
+    overageCost,
+    period: currentPeriod(),
+  };
+}
 
 // Behind a host's load balancer (Render, Railway, Fly, etc.) the client IP
 // arrives in X-Forwarded-For. Trust it so the rate limiter buckets per real
@@ -307,12 +361,25 @@ function renderCurrentFiles(files) {
   return `--- CURRENT PROJECT FILES ---\n${blocks.join('\n')}\n--- END CURRENT PROJECT FILES ---`;
 }
 
-// Non-secret client config: whether a free managed agent is available, the
-// free token allowance, and the (public) payment / add-on links. No keys here.
+// Public plan catalog (no secrets) the UI renders from, so pricing and the
+// usage meter always match the server's real numbers.
+function publicPlans() {
+  return Object.values(PLANS).map((p) => ({
+    id: p.id, name: p.name, price: p.price,
+    monthlyTokens: p.monthlyTokens,
+    overagePer1k: p.overagePer1k,
+    allowOverage: p.allowOverage,
+    link: p.link,
+  }));
+}
+
+// Non-secret client config: whether the managed agent is available, the plan
+// catalog, and the (public) payment / add-on links. No keys here.
 app.get('/api/config', (req, res) => {
   res.json({
     managedAgent: !!SERVER_AI_KEY,
-    freeTokens: FREE_TOKEN_QUOTA,
+    freeTokens: PLANS.free.monthlyTokens,
+    plans: publicPlans(),
     stripeProLink: STRIPE_PRO_LINK,
     stripeStudioLink: STRIPE_STUDIO_LINK,
     courseLink: COURSE_LINK,
@@ -321,10 +388,25 @@ app.get('/api/config', (req, res) => {
   });
 });
 
-// Current free-tier usage for this anonymous visitor.
+// Current month's usage + billing snapshot for this anonymous visitor.
 app.get('/api/usage', (req, res) => {
   const cid = req.get('x-client-id') || req.ip || 'unknown';
-  res.json({ used: getUsage(cid), limit: FREE_TOKEN_QUOTA, managedAgent: !!SERVER_AI_KEY });
+  res.json(Object.assign({ managedAgent: !!SERVER_AI_KEY }, usageSummary(cid)));
+});
+
+// Activate a paid plan for this visitor. In production this is the job of a
+// VERIFIED Stripe webhook (checkout.session.completed) — do NOT trust the
+// client. This stub exists so the billing flow is demonstrable end-to-end; it
+// only runs when ALLOW_DEV_BILLING=1.
+app.post('/api/activate-plan', (req, res) => {
+  if (process.env.ALLOW_DEV_BILLING !== '1') {
+    return res.status(403).json({ error: 'Plan activation is handled by the payment webhook in production.' });
+  }
+  const cid = req.get('x-client-id') || req.ip || 'unknown';
+  const plan = (req.body && req.body.plan) || '';
+  if (!PLANS[plan]) return res.status(400).json({ error: 'Unknown plan.' });
+  planOf.set(cid, plan);
+  res.json(usageSummary(cid));
 });
 
 app.post('/api/chat', async (req, res) => {
@@ -352,12 +434,14 @@ app.post('/api/chat', async (req, res) => {
     apiKey = userKey;
     metered = false;
   } else if (SERVER_AI_KEY) {
-    if (getUsage(cid) >= FREE_TOKEN_QUOTA) {
+    // Plan-aware metering. Free users hard-stop at their monthly allowance;
+    // paid users may exceed it and accrue overage (billed per 1k tokens over).
+    const plan = getPlan(cid);
+    if (getUsage(cid) >= plan.monthlyTokens && !plan.allowOverage) {
       return res.status(402).json({
-        error: 'You’ve used your free token allowance. Upgrade to keep building, or add your own AI key for unlimited use.',
+        error: 'You’ve used your free monthly tokens. Pick a plan to keep building, or add your own AI key for unlimited use.',
         code: 'QUOTA_EXCEEDED',
-        used: getUsage(cid),
-        limit: FREE_TOKEN_QUOTA,
+        usage: usageSummary(cid),
         upgrade: { pro: STRIPE_PRO_LINK, studio: STRIPE_STUDIO_LINK },
       });
     }
@@ -420,7 +504,7 @@ app.post('/api/chat', async (req, res) => {
     res.json({
       reply,
       files,
-      usage: metered ? { used: getUsage(cid), limit: FREE_TOKEN_QUOTA } : null,
+      usage: metered ? usageSummary(cid) : null,
     });
   } catch (err) {
     // Pull the real reason out of the provider error so the visitor can act on

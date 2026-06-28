@@ -51,6 +51,20 @@ npm start
 Open http://localhost:3000 for the landing page, or
 http://localhost:3000/app.html for the builder.
 
+## Run on Replit
+
+This repo ships with a `.replit` config, so it imports and runs with no setup:
+
+1. In Replit: **Create Repl → Import from GitHub** and paste this repo's URL.
+2. Click **Run**. The config installs dependencies and starts the server; the
+   webview opens the landing page (add `/app.html` for the builder).
+3. *(Optional)* To enable the **free managed AI agent** without committing a key,
+   open the **Secrets** tab (lock icon) and add a secret named `SERVER_AI_KEY`
+   with a free Google Gemini key (`AIza…`). Add the billing/monetization vars
+   (see the table below) as Secrets too if you want them. Leave `SERVER_AI_KEY`
+   unset to run in bring-your-own-key mode.
+4. Use **Deploy** for a public URL (Autoscale or Reserved VM both work).
+
 ## AI keys, the free agent, and credits
 
 There are two ways the agent can be powered:
@@ -69,21 +83,37 @@ The key is stored **only in that visitor's browser** (`localStorage`), sent as
 the `x-anthropic-key` header per request, used once, and **never stored or
 logged** server-side.
 
-### 2. Free managed agent + token metering (the freemium model)
+### 2. Free managed agent + usage-based billing (the freemium model)
 
-Set `SERVER_AI_KEY` and the app offers a **free agent that needs no key from the
-visitor**, powered by your key and **metered against a free token allowance**
-(`FREE_TOKEN_QUOTA`). When a visitor exhausts the allowance, `/api/chat` returns
-**HTTP 402** and the UI shows the **upgrade modal** — or they can paste their own
-key for unlimited use.
+Set `SERVER_AI_KEY` and the app offers a **managed agent that needs no key from
+the visitor**, powered by your key and **metered, monthly, usage-based**:
+
+- Every visitor starts on the **Free** plan with a monthly token allowance
+  (`FREE_TOKEN_QUOTA`). When it's spent, `/api/chat` returns **HTTP 402** and the
+  UI shows the **upgrade modal**.
+- **Paid plans include a larger monthly allowance.** Pro = `PRO_TOKENS`,
+  Studio = `STUDIO_TOKENS`.
+- **Overage:** if a *paid* visitor goes over their included allowance, they keep
+  building and are billed **only for the overage** — by how much they exceed it,
+  at `$/1,000 tokens` (`PRO_OVERAGE_PER_1K`, `STUDIO_OVERAGE_PER_1K`). The Free
+  plan has no overage — it hard-stops.
+- **Allowances reset every calendar month** (usage is bucketed by `YYYY-MM`).
+
+The live usage meter in the workspace shows `plan · used / included this month`,
+and switches to `plan · +N over · $X` once a paid user is in overage.
 
 > **Tip:** a Google Gemini key (`AIza…`) has a permanently free tier, so you can
 > run the managed agent at no cost.
 >
-> **Note:** the token counter is **in-memory** and keyed by an anonymous browser
-> id — it's a demo-grade meter that resets on restart, not hardened billing. For
-> production, move the counter and payment verification to a database and verify
-> Stripe webhooks.
+> **How plans get assigned:** in production, a **verified Stripe webhook** should
+> set the visitor's plan after checkout. For local testing, set
+> `ALLOW_DEV_BILLING=1` and `POST /api/activate-plan { "plan": "pro" }` (with the
+> `x-client-id` header) to simulate a successful purchase.
+>
+> **Note:** usage + plan are tracked **in-memory**, keyed by an anonymous browser
+> id — demo-grade metering that resets on restart, not hardened billing. For
+> production, persist usage in a database, set plans from verified Stripe
+> webhooks, and report overage to Stripe metered billing.
 
 ## Monetization (configurable)
 
@@ -120,7 +150,10 @@ availability check + a registrar link if `DOMAIN_SEARCH_LINK` is unset.
 | `MODEL` | `claude-sonnet-4-6` | Anthropic model |
 | `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model |
 | `SERVER_AI_KEY` | — | enables the free managed agent |
-| `FREE_TOKEN_QUOTA` | `100000` | free tokens per visitor |
+| `FREE_TOKEN_QUOTA` | `100000` | Free plan tokens / month |
+| `PRO_TOKENS` / `STUDIO_TOKENS` | `2000000` / `10000000` | included tokens / month |
+| `PRO_OVERAGE_PER_1K` / `STUDIO_OVERAGE_PER_1K` | `0.002` / `0.0015` | $ per 1k tokens over plan |
+| `ALLOW_DEV_BILLING` | — | `1` lets `/api/activate-plan` set a plan without payment (testing) |
 | `STRIPE_PRO_LINK`, `STRIPE_STUDIO_LINK`, `COURSE_LINK`, `MARKETING_LINK`, `DOMAIN_SEARCH_LINK` | — | monetization links |
 
 Copy `.env.example` to `.env` to set any of these.
