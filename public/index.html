@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Site Builder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%236c5ce7'/%3E%3Cpath%20d='M16%207l5%209-5%209-5-9z'%20fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -13,42 +14,97 @@
       <span class="brand-mark">◆</span>
       <span>AI Site Builder</span>
     </div>
+    <div class="topbar-actions">
+      <span id="key-status" class="key-status" hidden>🔑 Key set</span>
+      <button id="key-btn" class="ghost-btn" title="Set your Anthropic API key">API key</button>
+      <button id="new-btn" class="ghost-btn" title="Start a new website">New site</button>
+    </div>
   </header>
 
-  <main class="layout">
-    <section class="composer">
-      <h1>Describe the website you want</h1>
-      <p class="subtitle">Be as specific as you like — business type, vibe, sections, colors.</p>
-
-      <textarea
-        id="prompt-input"
-        placeholder="e.g. A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form."
-        rows="6"
-      ></textarea>
-
-      <button id="generate-btn">
-        <span id="btn-label">Generate website</span>
-      </button>
-
-      <p id="error-msg" class="error-msg" hidden></p>
-
-      <div class="examples">
-        <span class="examples-label">Try:</span>
-        <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
-        <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
-        <button class="example-chip" data-text="A one-page site for a local bakery with a menu, hours, and location section. Pastel colors, playful font.">Bakery site</button>
+  <!-- Bring-your-own-key panel. The key lives only in this browser. -->
+  <div id="key-panel" class="key-panel" hidden>
+    <div class="key-panel-inner">
+      <h2>Use your own Anthropic API key</h2>
+      <p>
+        This app is bring-your-own-key: you supply your own key so you build
+        on your own Anthropic credits — nobody else can spend them. The key is
+        saved <strong>only in this browser</strong> (localStorage) and sent
+        straight to Anthropic for your requests. It’s never stored on the server.
+      </p>
+      <label for="key-input">Anthropic API key</label>
+      <input
+        id="key-input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="sk-ant-..."
+      />
+      <p id="key-error" class="error-msg" hidden></p>
+      <div class="key-panel-buttons">
+        <a class="key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key ↗</a>
+        <span class="spacer"></span>
+        <button id="key-clear" class="ghost-btn" hidden>Remove key</button>
+        <button id="key-save" class="primary-btn">Save key</button>
       </div>
+    </div>
+  </div>
+
+  <main class="layout">
+    <!-- Left: the conversation with the agent -->
+    <section class="chat-pane">
+      <div id="messages" class="messages">
+        <div class="msg agent intro">
+          <p>Hi! Describe the website you want and I’ll build it. Then just keep
+             chatting to tune it — “make the header darker”, “add a pricing
+             section”, “use a playful font”, and so on.</p>
+          <button class="load-example">✨ See an example site →</button>
+          <p class="examples-or">…or describe your own:</p>
+          <div class="examples">
+            <button class="example-chip" data-text="A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form.">Coffee shop</button>
+            <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
+            <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
+          </div>
+        </div>
+      </div>
+
+      <form id="composer" class="composer">
+        <textarea
+          id="prompt-input"
+          placeholder="Describe your website, or ask for a change…"
+          rows="2"
+        ></textarea>
+        <button id="send-btn" type="submit">
+          <span id="btn-label">Send</span>
+        </button>
+      </form>
+      <p id="error-msg" class="error-msg" hidden></p>
+      <p class="hint">Enter to send · Shift+Enter for a new line</p>
     </section>
 
+    <!-- Right: the live preview of the website being built -->
     <section class="preview-pane">
       <div class="preview-toolbar">
         <span class="preview-label">Live preview</span>
-        <button id="download-btn" disabled>Download HTML</button>
+        <div class="toolbar-actions">
+          <button id="open-btn" class="ghost-btn" disabled>Open in tab</button>
+          <button id="download-btn" class="ghost-btn" disabled>Download HTML</button>
+        </div>
       </div>
       <div id="preview-frame-wrap">
-        <iframe id="preview-frame" title="Generated website preview"></iframe>
+        <!-- Sandboxed WITHOUT allow-same-origin on purpose: the generated page's
+             scripts run in an opaque origin, so they can't reach this app's
+             localStorage (where the visitor's API key is kept) or cookies. -->
+        <iframe
+          id="preview-frame"
+          title="Generated website preview"
+          sandbox="allow-scripts allow-popups allow-forms allow-modals"
+        ></iframe>
         <div id="placeholder" class="placeholder">
-          <p>Your generated website will appear here.</p>
+          <p>Your website will appear here as the agent builds it.</p>
+        </div>
+        <div id="preview-loading" class="preview-loading" hidden>
+          <div class="spinner"></div>
+          <p>The agent is working…</p>
         </div>
       </div>
     </section>

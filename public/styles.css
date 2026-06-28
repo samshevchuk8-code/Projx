@@ -2,6 +2,13 @@
   box-sizing: border-box;
 }
 
+/* A class with `display:` set overrides the browser default for [hidden],
+   so the `hidden` attribute would silently stop working on the key panel and
+   loading overlay. Re-assert it. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --bg: #0f1115;
   --panel: #171a21;
@@ -14,6 +21,10 @@
   --radius: 10px;
 }
 
+html, body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -22,10 +33,11 @@ body {
 }
 
 .topbar {
-  padding: 16px 24px;
+  padding: 14px 24px;
   border-bottom: 1px solid var(--panel-border);
   display: flex;
   align-items: center;
+  justify-content: space-between;
 }
 
 .brand {
@@ -40,103 +52,238 @@ body {
   color: var(--accent);
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
-  padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
-@media (min-width: 900px) {
-  .layout {
-    grid-template-columns: 380px 1fr;
-    align-items: start;
-  }
-}
-
-.composer {
-  background: var(--panel);
+.ghost-btn {
+  background: transparent;
   border: 1px solid var(--panel-border);
-  border-radius: var(--radius);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ghost-btn:not(:disabled):hover {
+  border-color: var(--accent);
+}
+
+.ghost-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.key-status {
+  font-size: 12px;
+  color: #6ee7a8;
+  white-space: nowrap;
+}
+
+.primary-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* ---------- Bring-your-own-key panel ---------- */
+.key-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(8, 9, 12, 0.7);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
 }
 
-.composer h1 {
-  font-size: 19px;
-  margin: 0 0 6px;
+.key-panel-inner {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
 }
 
-.subtitle {
+.key-panel-inner h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.key-panel-inner p {
   color: var(--text-dim);
   font-size: 13px;
+  line-height: 1.55;
   margin: 0 0 16px;
 }
 
-textarea {
+.key-panel-inner label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+#key-input {
   width: 100%;
   background: #0f1115;
   border: 1px solid var(--panel-border);
   border-radius: var(--radius);
   color: var(--text);
-  padding: 12px;
+  padding: 11px 12px;
   font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
-textarea:focus {
+#key-input:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-#generate-btn {
-  width: 100%;
-  margin-top: 12px;
-  background: var(--accent);
-  color: white;
-  border: none;
+.key-panel-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.key-panel-buttons .spacer {
+  flex: 1;
+}
+
+.key-link {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.key-link:hover {
+  text-decoration: underline;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+  padding: 20px 24px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+/* On desktop the app is a fixed-height two-column shell (each pane scrolls
+   internally). On mobile we let the document flow and scroll normally —
+   pinning the height there clips the stacked panes. */
+@media (min-width: 900px) {
+  .layout {
+    grid-template-columns: 420px 1fr;
+    align-items: stretch;
+    height: calc(100vh - 53px);
+  }
+}
+
+/* ---------- Chat pane ---------- */
+.chat-pane {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
   border-radius: var(--radius);
-  padding: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 4px;
+}
+
+.msg {
+  max-width: 92%;
+  padding: 10px 13px;
+  border-radius: 12px;
   font-size: 14px;
+  line-height: 1.5;
+}
+
+.msg p {
+  margin: 0;
+}
+
+/* Preserve line breaks only in real chat turns (added via textContent),
+   not in the static intro markup, whose source indentation would otherwise
+   render as ragged wrapping. */
+.msg:not(.intro) p {
+  white-space: pre-wrap;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: var(--accent);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.agent {
+  align-self: flex-start;
+  background: #1f232c;
+  border: 1px solid var(--panel-border);
+  border-bottom-left-radius: 4px;
+}
+
+.msg.intro {
+  max-width: 100%;
+}
+
+.load-example {
+  margin-top: 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
 
-#generate-btn:hover {
+.load-example:hover {
   background: var(--accent-hover);
 }
 
-#generate-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error-msg {
-  color: var(--danger);
-  font-size: 13px;
-  margin-top: 10px;
+.examples-or {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
 }
 
 .examples {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid var(--panel-border);
+  margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  align-items: center;
-}
-
-.examples-label {
-  color: var(--text-dim);
-  font-size: 12px;
-  margin-right: 4px;
 }
 
 .example-chip {
-  background: #1f232c;
+  background: #161922;
   border: 1px solid var(--panel-border);
   color: var(--text-dim);
   border-radius: 999px;
@@ -150,6 +297,94 @@ textarea:focus {
   color: var(--text);
 }
 
+/* typing indicator */
+.msg.thinking {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  animation: blink 1.2s infinite ease-in-out both;
+}
+
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
+}
+
+.composer {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+textarea {
+  flex: 1;
+  width: 100%;
+  background: #0f1115;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  max-height: 160px;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+textarea:disabled {
+  opacity: 0.6;
+}
+
+#send-btn {
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#send-btn:hover {
+  background: var(--accent-hover);
+}
+
+#send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error-msg {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+
+.hint {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin: 8px 0 0;
+  text-align: center;
+}
+
+/* ---------- Preview pane ---------- */
 .preview-pane {
   background: var(--panel);
   border: 1px solid var(--panel-border);
@@ -175,23 +410,9 @@ textarea:focus {
   letter-spacing: 0.04em;
 }
 
-#download-btn {
-  background: transparent;
-  border: 1px solid var(--panel-border);
-  color: var(--text);
-  border-radius: 8px;
-  padding: 6px 12px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-#download-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-#download-btn:not(:disabled):hover {
-  border-color: var(--accent);
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
 }
 
 #preview-frame-wrap {
@@ -217,4 +438,31 @@ textarea:focus {
   color: #aaa;
   font-size: 13px;
   background: #fafafa;
+}
+
+.preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(15, 17, 21, 0.55);
+  backdrop-filter: blur(2px);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }

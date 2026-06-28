@@ -1,0 +1,19 @@
+# Render Blueprint — one-click deploy.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# This app is bring-your-own-key, so there is NO server-side API key to set.
+# Render injects PORT automatically; server.js already reads process.env.PORT.
+services:
+  - type: web
+    name: ai-site-builder
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Optional: pin the Claude model the agent uses.
+      - key: MODEL
+        value: claude-sonnet-4-6
