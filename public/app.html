@@ -19,7 +19,7 @@
       <div id="usage-meter" class="usage-meter" hidden>
         <div class="usage-bar-wrap"><div id="usage-bar" class="usage-bar"></div></div>
         <span id="usage-text" class="usage-num"></span>
-        <button id="upgrade-btn" class="ghost-btn" onclick="document.getElementById('upgrade-panel').hidden=false">Upgrade</button>
+        <button id="upgrade-btn" class="ghost-btn">Upgrade</button>
       </div>
       <label class="project-switch">
         <select id="project-select" title="Switch project"></select>
@@ -61,17 +61,18 @@
   <div id="upgrade-panel" class="modal" hidden>
     <div class="modal-card upgrade-card">
       <button id="upgrade-close" class="modal-x" title="Close">✕</button>
-      <h2>Keep building — upgrade your plan</h2>
-      <p>You’ve reached the free token allowance. Pick a plan to continue, or add
-         your own AI key for unlimited building.</p>
+      <h2>Keep building — pick a plan</h2>
+      <p>You’ve used your free monthly tokens. Paid plans include a bigger
+         monthly allowance, and if you go over, you only pay for the overage —
+         metered by how much you exceed it. Allowances reset every month.</p>
       <div class="plan-grid">
         <div class="plan">
           <h3>Pro</h3>
-          <div class="plan-price">$12<span>/mo</span></div>
+          <div class="plan-price" id="plan-pro-price">$12<span>/mo</span></div>
           <ul>
-            <li>2,000,000 tokens / month</li>
-            <li>Unlimited projects</li>
-            <li>ZIP export &amp; hosting handoff</li>
+            <li id="plan-pro-tokens">2M tokens / month included</li>
+            <li id="plan-pro-overage">then pay-as-you-go overage</li>
+            <li>Unlimited projects &amp; ZIP export</li>
             <li>Priority agent</li>
           </ul>
           <a id="upgrade-pro" class="primary-btn block disabled" href="#" target="_blank" rel="noopener">Go Pro</a>
@@ -79,17 +80,17 @@
         <div class="plan featured">
           <span class="plan-flag">Most popular</span>
           <h3>Studio</h3>
-          <div class="plan-price">$39<span>/mo</span></div>
+          <div class="plan-price" id="plan-studio-price">$39<span>/mo</span></div>
           <ul>
-            <li>10,000,000 tokens / month</li>
-            <li>Everything in Pro</li>
+            <li id="plan-studio-tokens">10M tokens / month included</li>
+            <li id="plan-studio-overage">then cheaper overage</li>
             <li>Marketing toolkit included</li>
             <li>1 free domain for a year</li>
           </ul>
           <a id="upgrade-studio" class="primary-btn block disabled" href="#" target="_blank" rel="noopener">Get Studio</a>
         </div>
       </div>
-      <p class="upgrade-foot">Prefer pay-as-you-go? <a href="#" id="upgrade-byok" onclick="document.getElementById('upgrade-panel').hidden=true;document.getElementById('key-btn').click();return false;">Use your own AI key</a> for unlimited free building.</p>
+      <p class="upgrade-foot">Prefer no metering at all? <a href="#" id="upgrade-byok" onclick="document.getElementById('upgrade-panel').hidden=true;document.getElementById('key-btn').click();return false;">Use your own AI key</a> for unlimited building.</p>
     </div>
   </div>
 

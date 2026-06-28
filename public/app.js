@@ -147,29 +147,56 @@ async function refreshUsage() {
     if (!res.ok) { usageMeter.hidden = true; return; }
     const u = await res.json();
     const used = u.used || 0;
-    const limit = u.limit || config.freeTokens || 1;
-    const pct = Math.min(100, Math.round((used / limit) * 100));
+    const included = u.included || config.freeTokens || 1;
+    const pct = Math.min(100, Math.round((used / included) * 100));
     usageMeter.hidden = false;
-    usageText.textContent = `${fmt(used)} / ${fmt(limit)} free tokens`;
+    if (u.overageTokens > 0) {
+      // Paid plan, over the monthly allowance → showing accrued overage charge.
+      usageText.textContent = `${u.planName} · +${fmt(u.overageTokens)} over · $${(u.overageCost || 0).toFixed(2)}`;
+    } else {
+      usageText.textContent = `${u.planName} · ${fmt(used)} / ${fmt(included)} this month`;
+    }
     usageBar.style.width = pct + '%';
-    usageBar.classList.toggle('warn', pct >= 80);
-    usageBar.classList.toggle('full', pct >= 100);
+    usageBar.classList.toggle('warn', pct >= 80 && !u.overageTokens);
+    usageBar.classList.toggle('full', u.overageTokens > 0 || pct >= 100);
   } catch (e) { usageMeter.hidden = true; }
 }
 function fmt(n) {
+  if (n >= 1000000) return (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + 'M';
   if (n >= 1000) return (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k';
   return String(n);
 }
+function money(n) { return '$' + (n || 0).toFixed(2); }
+function perKLabel(rate) {
+  // rate is $ per 1,000 tokens, which is sub-cent — show the friendlier
+  // per-million figure instead.
+  if (!rate) return '';
+  return `${money(rate * 1000)} per 1M tokens over your plan`;
+}
 
 function openUpgrade() {
-  // Fill payment links if configured.
-  const proLink = $('upgrade-pro');
-  const studioLink = $('upgrade-studio');
-  if (config.stripeProLink) { proLink.href = config.stripeProLink; proLink.classList.remove('disabled'); }
-  if (config.stripeStudioLink) { studioLink.href = config.stripeStudioLink; studioLink.classList.remove('disabled'); }
+  // Fill plan details + payment links from the server's real plan catalog so
+  // the modal always matches billing.
+  const plans = (config.plans || []).reduce((m, p) => (m[p.id] = p, m), {});
+  fillPlanCard('pro', plans.pro, config.stripeProLink);
+  fillPlanCard('studio', plans.studio, config.stripeStudioLink);
   upgradePanel.hidden = false;
 }
+function fillPlanCard(id, plan, link) {
+  if (!plan) return;
+  const price = $(`plan-${id}-price`);
+  const tokens = $(`plan-${id}-tokens`);
+  const overage = $(`plan-${id}-overage`);
+  const btn = $(`upgrade-${id}`);
+  if (price) price.innerHTML = `$${plan.price}<span>/mo</span>`;
+  if (tokens) tokens.textContent = `${fmt(plan.monthlyTokens)} tokens / month included`;
+  if (overage) overage.textContent = plan.allowOverage
+    ? `then ${perKLabel(plan.overagePer1k)}`
+    : '';
+  if (btn && link) { btn.href = link; btn.classList.remove('disabled'); }
+}
 function closeUpgrade() { upgradePanel.hidden = true; }
+$('upgrade-btn').addEventListener('click', openUpgrade);
 upgradeClose.addEventListener('click', closeUpgrade);
 upgradePanel.addEventListener('click', (e) => { if (e.target === upgradePanel) closeUpgrade(); });
 
