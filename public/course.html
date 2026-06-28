@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Build &amp; Launch Your Website — Atelier Course</title>
+<meta name="description" content="A step-by-step course on designing, writing, and launching a website that converts — with worked examples in Atelier.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%236c5ce7'/%3E%3Cpath%20d='M16%207l5%209-5%209-5-9z'%20fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="landing.css">
+</head>
+<body class="landing">
+
+  <nav class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html" style="text-decoration:none">
+        <span class="brand-mark">◆</span>
+        <span class="brand-name">Atelier</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html#features">Features</a>
+        <a href="index.html#pricing">Pricing</a>
+        <a class="btn btn-primary" href="app.html">Start building →</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero wrap">
+    <span class="eyebrow">🎓 Self-paced · Lifetime access</span>
+    <h1>Build &amp; Launch<br><span class="grad">Your Website</span></h1>
+    <p class="sub">
+      A practical, no-fluff course on turning an idea into a live, money-making
+      website — design, copywriting, SEO, and getting your first visitors. Every
+      lesson has a worked example you build right inside Atelier with the AI agent.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" id="enroll-top" href="#enroll">Enroll — $49 one-time</a>
+      <a class="btn btn-ghost btn-lg" href="app.html">Open the builder</a>
+    </div>
+    <p class="hero-note">8 modules · 40+ lessons · Worked examples · Lifetime updates</p>
+  </header>
+
+  <section class="block wrap">
+    <div class="section-head">
+      <h2>What you’ll learn</h2>
+      <p>From blank page to launched site — and the marketing to back it.</p>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="ic">1️⃣</div><h3>Foundations</h3><p>Pick a goal, structure your pages, and brief the AI agent so it builds exactly what you mean.</p></div>
+      <div class="feature"><div class="ic">2️⃣</div><h3>Design that converts</h3><p>Layout, hierarchy, color and type — the principles behind sites that feel professional.</p></div>
+      <div class="feature"><div class="ic">3️⃣</div><h3>Copywriting</h3><p>Headlines, value props, and calls to action that turn visitors into customers.</p></div>
+      <div class="feature"><div class="ic">4️⃣</div><h3>Responsive &amp; fast</h3><p>Make it look great on every screen and load quickly — straight from the agent’s output.</p></div>
+      <div class="feature"><div class="ic">5️⃣</div><h3>SEO basics</h3><p>Titles, meta tags, structured content, and sitemaps so people can actually find you.</p></div>
+      <div class="feature"><div class="ic">6️⃣</div><h3>Forms &amp; capture</h3><p>Contact forms, email signups, and connecting them to tools you already use.</p></div>
+      <div class="feature"><div class="ic">7️⃣</div><h3>Launch &amp; domains</h3><p>Buy a domain, deploy your code, and go live with confidence.</p></div>
+      <div class="feature"><div class="ic">8️⃣</div><h3>Marketing your launch</h3><p>Your first 1,000 visitors: social, ads, and content that compounds.</p></div>
+    </div>
+  </section>
+
+  <section class="wrap" id="enroll">
+    <div class="cta-final">
+      <h2>Enroll today</h2>
+      <p>One payment. Lifetime access. Build alongside every lesson in Atelier.</p>
+      <a class="btn btn-primary btn-lg" id="enroll-btn" href="#">Enroll — $49</a>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap footer-inner">
+      <span>◆ Atelier — AI Website Builder</span>
+      <span><a href="index.html">Home</a> · <a href="app.html">Workspace</a></span>
+    </div>
+  </footer>
+
+  <script>
+    (async function () {
+      let cfg = {};
+      try { const r = await fetch('/api/config'); if (r.ok) cfg = await r.json(); } catch (e) {}
+      if (cfg.courseLink) {
+        document.getElementById('enroll-btn').href = cfg.courseLink;
+        document.getElementById('enroll-top').href = cfg.courseLink;
+      }
+    })();
+  </script>
+</body>
+</html>

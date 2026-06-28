@@ -17,12 +17,40 @@ const PORT = process.env.PORT || 3000;
 const MODEL = process.env.MODEL || 'claude-sonnet-4-6';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
+// ---- Free managed AI agent (optional) -------------------------------------
+// If you set SERVER_AI_KEY, the app offers a "free agent" that uses YOUR key,
+// metered against a per-visitor free token allowance. Once a visitor passes
+// FREE_TOKEN_QUOTA, the agent is paywalled (HTTP 402) and they must upgrade
+// (Stripe payment links below) or paste their own key for unlimited use.
+//
+// A free, strong default: get a Google Gemini key (AIza…) — its free tier is
+// permanently free — and set it as SERVER_AI_KEY. The app then works with no
+// key prompt for visitors until they exhaust the allowance.
+//
+// NOTE: usage is tracked IN MEMORY (resets on restart) and is per anonymous
+// browser id, so it's a demo-grade meter, not hardened billing. For production
+// move the counter + payment verification to a database and verify Stripe
+// webhooks. Payments and domain purchases are wired as configurable links;
+// plug in your own Stripe + registrar accounts via the env vars below.
+const SERVER_AI_KEY = (process.env.SERVER_AI_KEY || '').trim();
+const FREE_TOKEN_QUOTA = parseInt(process.env.FREE_TOKEN_QUOTA || '100000', 10);
+const STRIPE_PRO_LINK = process.env.STRIPE_PRO_LINK || '';
+const STRIPE_STUDIO_LINK = process.env.STRIPE_STUDIO_LINK || '';
+const COURSE_LINK = process.env.COURSE_LINK || '';
+const MARKETING_LINK = process.env.MARKETING_LINK || '';
+const DOMAIN_SEARCH_LINK = process.env.DOMAIN_SEARCH_LINK || '';
+
+// Per-visitor token tally for the free managed agent. Map<clientId, tokens>.
+const usage = new Map();
+function getUsage(id) { return usage.get(id) || 0; }
+function addUsage(id, tokens) { if (id && tokens > 0) usage.set(id, getUsage(id) + tokens); }
+
 // Behind a host's load balancer (Render, Railway, Fly, etc.) the client IP
 // arrives in X-Forwarded-For. Trust it so the rate limiter buckets per real
 // visitor instead of lumping everyone under the proxy's single IP.
 app.set('trust proxy', true);
 
-app.use(express.json({ limit: '4mb' }));
+app.use(express.json({ limit: '8mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Light in-memory rate limiter — just abuse protection so a single IP can't
@@ -58,85 +86,147 @@ function detectProvider(key) {
   return null;
 }
 
-// The agent returns a short, human reply AND the full website on every turn.
-// We separate the two with a sentinel so the frontend can show the chat
-// message in the conversation and load the HTML into the live preview.
-// (A sentinel is far more robust than JSON here — escaping a whole HTML
-// document into a JSON string balloons tokens and breaks easily.)
-const HTML_MARKER = '===WEBSITE_HTML===';
+// The agent returns a short, human reply AND a whole multi-file website project
+// on every turn. We separate the two with sentinels so the frontend can show
+// the chat message in the conversation and load each file into the workspace
+// (file explorer + editor + live preview).
+//
+// Sentinels are far more robust than JSON here: escaping multiple whole source
+// files into one JSON string balloons tokens and breaks on the slightest stray
+// quote or backslash. The format is line-based and easy to parse forgivingly.
+const FILES_MARKER = '===FILES===';
+const FILE_HEADER = /^===FILE:\s*(.+?)\s*===$/; // ===FILE: path/name.ext===
+const END_MARKER = '===END==='; // optional terminator
 
-const SYSTEM_PROMPT = `You are an expert web design agent inside an app called "AI Site Builder".
-A person describes a website, then keeps chatting with you to tune it — "make the
-header darker", "add a pricing section", "use a more playful font", and so on.
-You maintain ONE single-page website across the whole conversation and edit it
-in place from one turn to the next.
+const SYSTEM_PROMPT = `You are an expert full-stack web design agent inside an app called "Atelier" — an AI website builder (think Replit, but focused entirely on shipping beautiful, real websites). A person describes a website, then keeps chatting with you to build and refine it: "make the header darker", "add an about page", "wire up the contact form", "use a more playful font".
 
-On EVERY turn you must reply in exactly this format:
+You maintain ONE website PROJECT made of multiple files across the whole conversation, and you edit it in place from one turn to the next.
+
+On EVERY turn you must reply in EXACTLY this format:
 
 <a short, friendly message — 1 to 3 sentences — saying what you just built or changed>
-${HTML_MARKER}
-<the COMPLETE, updated HTML document>
+${FILES_MARKER}
+===FILE: index.html===
+<the complete contents of index.html>
+===FILE: styles.css===
+<the complete contents of styles.css>
+===FILE: script.js===
+<the complete contents of script.js>
+${END_MARKER}
 
-Rules for the message (the part before ${HTML_MARKER}):
-- Keep it brief and conversational. No markdown, no code, no bullet lists.
+Rules for the message (everything before ${FILES_MARKER}):
+- Brief and conversational. No markdown, no code, no bullet lists.
 - Describe the change you made, not the whole site.
 
-Rules for the HTML (the part after ${HTML_MARKER}):
-- Output the ENTIRE document every time, even for a tiny tweak. Never send a diff,
-  a snippet, or "...". The frontend replaces the whole preview with what you return.
-- It must start with <!DOCTYPE html> and end with </html>.
-- One self-contained file: all CSS in a <style> tag in the <head>, all JS in a
-  <script> tag. No external stylesheet or JS file references.
-- You MAY use a CDN for fonts/icons (e.g. Google Fonts) but the page must still
-  work if that CDN fails to load.
-- For images use https://placehold.co or CSS gradients/shapes — never images that
-  need an API key.
-- Make it genuinely good: clear visual hierarchy, real sample copy that fits the
-  request (no lorem ipsum), a responsive layout (it is shown in a resizable
-  iframe), and a cohesive palette and typography.
-- When the user asks for a change, KEEP everything else the same and only modify
-  what they asked for, unless they ask for a fresh start.
+Rules for the files (everything after ${FILES_MARKER}):
+- Output the ENTIRE project — every file, in full — on EVERY turn, even for a tiny tweak. Never send a diff, a snippet, or "...". The workspace replaces the whole project with exactly the files you return, so any file you omit is DELETED.
+- Begin each file with a line of the exact form: ===FILE: <relative/path>===  then the file's full contents on the following lines.
+- There MUST be a file named "index.html" — it is the site's entry point/home page.
+- Split concerns into real files: put CSS in "styles.css" and JS in "script.js" and link them from the HTML (<link rel="stylesheet" href="styles.css"> and <script src="script.js" defer></script>). For multi-page sites, add more .html pages (e.g. "about.html", "contact.html") and link between them with relative hrefs. Shared CSS/JS should be reused across pages, not duplicated.
+- Use ONLY plain HTML, CSS, and vanilla JavaScript — no build step, no frameworks that need compiling, no npm. The files must work by opening index.html directly.
+- You MAY load fonts/icons from a CDN (e.g. Google Fonts), but the site must still look fine if the CDN fails.
+- For images use https://placehold.co or CSS gradients/shapes — never images that need an API key.
+- Make it genuinely good: clear visual hierarchy, real sample copy that fits the request (no lorem ipsum), responsive layout (it is shown in a resizable frame), accessible markup, and a cohesive palette and typography.
+- When the user asks for a change, KEEP everything else intact and only modify what they asked for, unless they ask for a fresh start.
 
-Never put anything after </html>. Never wrap the HTML in markdown code fences.`;
+Never wrap files in markdown code fences. Never write anything after the last file (or after ${END_MARKER}).`;
 
 /**
- * Pull the chat reply and the HTML document out of one model response.
- * Tolerates a few ways the model might drift from the exact format.
+ * Pull the chat reply and the set of project files out of one model response.
+ * Returns { reply, files } where files is [{ path, content }]. Tolerant of a
+ * few ways the model might drift from the exact format.
  */
-function splitReplyAndHtml(raw) {
-  const text = (raw || '').trim();
+function parseProjectResponse(raw) {
+  const text = (raw || '').replace(/\r\n/g, '\n').trim();
 
+  const markerIdx = text.indexOf(FILES_MARKER);
   let reply = '';
-  let html = '';
+  let body = '';
 
-  const markerIdx = text.indexOf(HTML_MARKER);
   if (markerIdx !== -1) {
     reply = text.slice(0, markerIdx).trim();
-    html = text.slice(markerIdx + HTML_MARKER.length).trim();
+    body = text.slice(markerIdx + FILES_MARKER.length).trim();
   } else {
-    // No sentinel. Fall back to locating where the HTML document starts.
-    const lower = text.toLowerCase();
-    const docIdx = lower.indexOf('<!doctype');
-    const htmlIdx = lower.indexOf('<html');
-    const start = docIdx !== -1 ? docIdx : htmlIdx;
-    if (start !== -1) {
-      reply = text.slice(0, start).trim();
-      html = text.slice(start).trim();
+    // No FILES marker. Maybe the model emitted file headers directly, or just
+    // a single HTML document. Try to recover something usable.
+    const firstHeader = text.search(/^===FILE:/m);
+    if (firstHeader !== -1) {
+      reply = text.slice(0, firstHeader).trim();
+      body = text.slice(firstHeader).trim();
     } else {
-      // Couldn't find any HTML — treat the whole thing as a chat reply.
-      reply = text;
-      html = '';
+      const lower = text.toLowerCase();
+      const docIdx = lower.indexOf('<!doctype');
+      const start = docIdx !== -1 ? docIdx : lower.indexOf('<html');
+      if (start !== -1) {
+        reply = text.slice(0, start).trim();
+        let html = text.slice(start).trim();
+        html = stripFence(html);
+        return { reply: reply || 'Here’s your website.', files: [{ path: 'index.html', content: html }] };
+      }
+      return { reply: text || 'I wasn’t able to build that — try rephrasing.', files: [] };
     }
   }
 
-  // Strip a stray markdown fence if the model added one despite instructions.
-  html = html.replace(/^```(?:html)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  const files = parseFiles(body);
 
-  if (!reply) {
-    reply = html ? 'Here’s your website.' : 'I wasn’t able to build that — try rephrasing.';
+  if (!reply) reply = files.length ? 'Here’s your website.' : 'I wasn’t able to build that — try rephrasing.';
+  return { reply, files };
+}
+
+// Walk the body line by line, splitting on "===FILE: path===" headers.
+function parseFiles(body) {
+  const lines = body.split('\n');
+  const files = [];
+  let current = null;
+  let buf = [];
+
+  const flush = () => {
+    if (current) {
+      let content = buf.join('\n');
+      content = stripFence(content).replace(/\s+$/, '') + '\n';
+      files.push({ path: current, content });
+    }
+    buf = [];
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const header = trimmed.match(FILE_HEADER);
+    if (header) {
+      flush();
+      current = sanitizePath(header[1]);
+      continue;
+    }
+    if (trimmed === END_MARKER || trimmed === FILES_MARKER) {
+      // Terminator (or a stray repeated marker): stop collecting this file.
+      flush();
+      current = null;
+      continue;
+    }
+    if (current) buf.push(line);
   }
+  flush();
 
-  return { reply, html };
+  // De-dupe by path (last one wins) and drop empties.
+  const byPath = new Map();
+  for (const f of files) {
+    if (f.path && f.content.trim()) byPath.set(f.path, f);
+  }
+  return [...byPath.values()];
+}
+
+// Keep paths safe and relative: no leading slash, no "..", no backslashes.
+function sanitizePath(p) {
+  return String(p)
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .split('/')
+    .filter((seg) => seg && seg !== '.' && seg !== '..')
+    .join('/');
+}
+
+function stripFence(s) {
+  return s.replace(/^```[a-zA-Z0-9]*\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
 }
 
 // --- Provider calls ---------------------------------------------------------
@@ -149,18 +239,20 @@ async function callAnthropic(apiKey, convo) {
   const anthropic = new Anthropic({ apiKey });
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 16000,
+    max_tokens: 32000,
     system: SYSTEM_PROMPT,
     messages: convo,
   });
   const textBlock = message.content.find((block) => block.type === 'text');
-  return textBlock ? textBlock.text : '';
+  const u = message.usage || {};
+  const tokens = (u.input_tokens || 0) + (u.output_tokens || 0);
+  return { text: textBlock ? textBlock.text : '', tokens };
 }
 
 async function callGemini(apiKey, convo) {
   // Gemini uses role "model" instead of "assistant", and a separate
   // system_instruction. thinkingBudget:0 keeps the whole output budget for the
-  // HTML so a long page doesn't get truncated by the model's internal thinking.
+  // files so a multi-page project doesn't get truncated by internal thinking.
   const contents = convo.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
@@ -175,7 +267,7 @@ async function callGemini(apiKey, convo) {
         system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents,
         generationConfig: {
-          maxOutputTokens: 32000,
+          maxOutputTokens: 48000,
           temperature: 1,
           thinkingConfig: { thinkingBudget: 0 },
         },
@@ -184,19 +276,56 @@ async function callGemini(apiKey, convo) {
   );
 
   if (!res.ok) {
-    let body = null;
-    try { body = await res.json(); } catch (e) { /* non-JSON error body */ }
+    let errBody = null;
+    try { errBody = await res.json(); } catch (e) { /* non-JSON error body */ }
     const err = new Error('Gemini request failed');
     err.status = res.status;
-    err.providerMessage = (body && body.error && body.error.message) || '';
+    err.providerMessage = (errBody && errBody.error && errBody.error.message) || '';
     throw err;
   }
 
   const data = await res.json();
   const cand = data.candidates && data.candidates[0];
   const parts = cand && cand.content && cand.content.parts;
-  return Array.isArray(parts) ? parts.map((p) => p.text || '').join('') : '';
+  const text = Array.isArray(parts) ? parts.map((p) => p.text || '').join('') : '';
+  const um = data.usageMetadata || {};
+  const tokens = um.totalTokenCount || ((um.promptTokenCount || 0) + (um.candidatesTokenCount || 0));
+  return { text, tokens };
 }
+
+// Render the current project as plain text the agent can read & edit from. We
+// attach it to the latest user turn rather than replaying every past version of
+// every file (which would burn an enormous number of tokens). Prior assistant
+// turns in `convo` are just the short chat replies — enough conversational
+// memory without resending old file contents.
+function renderCurrentFiles(files) {
+  if (!Array.isArray(files) || files.length === 0) return '';
+  const blocks = files
+    .filter((f) => f && typeof f.path === 'string' && typeof f.content === 'string')
+    .map((f) => `===FILE: ${sanitizePath(f.path)}===\n${f.content}`);
+  if (!blocks.length) return '';
+  return `--- CURRENT PROJECT FILES ---\n${blocks.join('\n')}\n--- END CURRENT PROJECT FILES ---`;
+}
+
+// Non-secret client config: whether a free managed agent is available, the
+// free token allowance, and the (public) payment / add-on links. No keys here.
+app.get('/api/config', (req, res) => {
+  res.json({
+    managedAgent: !!SERVER_AI_KEY,
+    freeTokens: FREE_TOKEN_QUOTA,
+    stripeProLink: STRIPE_PRO_LINK,
+    stripeStudioLink: STRIPE_STUDIO_LINK,
+    courseLink: COURSE_LINK,
+    marketingLink: MARKETING_LINK,
+    domainSearchLink: DOMAIN_SEARCH_LINK,
+  });
+});
+
+// Current free-tier usage for this anonymous visitor.
+app.get('/api/usage', (req, res) => {
+  const cid = req.get('x-client-id') || req.ip || 'unknown';
+  res.json({ used: getUsage(cid), limit: FREE_TOKEN_QUOTA, managedAgent: !!SERVER_AI_KEY });
+});
 
 app.post('/api/chat', async (req, res) => {
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
@@ -204,22 +333,49 @@ app.post('/api/chat', async (req, res) => {
     return res.status(429).json({ error: 'Too many requests. Wait a bit and try again.' });
   }
 
+  const cid = req.get('x-client-id') || ip;
   const userKey = getUserKey(req);
-  if (!userKey) {
+
+  // Decide which key powers this request:
+  //  - the visitor's own key  -> unlimited, never metered
+  //  - else the server's free managed key -> metered against the free quota
+  //  - else nothing configured -> ask the visitor for a key
+  let apiKey, provider, metered;
+  if (userKey) {
+    provider = detectProvider(userKey);
+    if (!provider) {
+      return res.status(401).json({
+        error: 'That doesn’t look like a valid key. Use a free Google Gemini key ("AIza…") or an Anthropic key ("sk-ant-…").',
+        code: 'BAD_KEY',
+      });
+    }
+    apiKey = userKey;
+    metered = false;
+  } else if (SERVER_AI_KEY) {
+    if (getUsage(cid) >= FREE_TOKEN_QUOTA) {
+      return res.status(402).json({
+        error: 'You’ve used your free token allowance. Upgrade to keep building, or add your own AI key for unlimited use.',
+        code: 'QUOTA_EXCEEDED',
+        used: getUsage(cid),
+        limit: FREE_TOKEN_QUOTA,
+        upgrade: { pro: STRIPE_PRO_LINK, studio: STRIPE_STUDIO_LINK },
+      });
+    }
+    apiKey = SERVER_AI_KEY;
+    provider = detectProvider(SERVER_AI_KEY);
+    if (!provider) {
+      // Misconfigured server key — fail clearly instead of leaking it upstream.
+      return res.status(500).json({ error: 'The free agent is misconfigured on the server.' });
+    }
+    metered = true;
+  } else {
     return res.status(401).json({
       error: 'Add an AI key to start building. It stays in your browser and is used only for your own requests.',
       code: 'NO_KEY',
     });
   }
-  const provider = detectProvider(userKey);
-  if (!provider) {
-    return res.status(401).json({
-      error: 'That doesn’t look like a valid key. Use a free Google Gemini key ("AIza…") or an Anthropic key ("sk-ant-…").',
-      code: 'BAD_KEY',
-    });
-  }
 
-  const { messages, currentHtml } = req.body || {};
+  const { messages, currentFiles } = req.body || {};
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'No conversation provided.' });
@@ -243,26 +399,29 @@ app.post('/api/chat', async (req, res) => {
     return res.status(400).json({ error: 'That message is too long (max 4000 characters).' });
   }
 
-  // Give the model the current HTML to edit from. We attach it to the latest
-  // user turn rather than replaying every past HTML version (which would burn
-  // a huge number of tokens). The prior assistant turns in `convo` are just
-  // the short chat replies, which is enough conversational memory.
-  if (typeof currentHtml === 'string' && currentHtml.trim()) {
+  const projectText = renderCurrentFiles(currentFiles);
+  if (projectText) {
     lastUser.content =
-      `Here is the current website HTML you produced. Modify it to satisfy my request, ` +
-      `keeping everything else intact unless I ask otherwise.\n\n` +
-      `--- CURRENT HTML ---\n${currentHtml.trim()}\n--- END CURRENT HTML ---\n\n` +
+      `Here are the current files of the website project you produced. Modify them to satisfy my request, ` +
+      `keeping everything else intact unless I ask otherwise. Remember to return EVERY file in full.\n\n` +
+      `${projectText}\n\n` +
       `My request: ${lastUser.content}`;
   }
 
   try {
-    const rawText =
+    const result =
       provider === 'gemini'
-        ? await callGemini(userKey, convo)
-        : await callAnthropic(userKey, convo);
+        ? await callGemini(apiKey, convo)
+        : await callAnthropic(apiKey, convo);
 
-    const { reply, html } = splitReplyAndHtml(rawText);
-    res.json({ reply, html });
+    if (metered) addUsage(cid, result.tokens);
+
+    const { reply, files } = parseProjectResponse(result.text);
+    res.json({
+      reply,
+      files,
+      usage: metered ? { used: getUsage(cid), limit: FREE_TOKEN_QUOTA } : null,
+    });
   } catch (err) {
     // Pull the real reason out of the provider error so the visitor can act on
     // it, instead of hiding everything behind a generic "failed" message.
@@ -332,6 +491,6 @@ app.post('/api/chat', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`\n✅ AI Site Builder running at http://localhost:${PORT}`);
+  console.log(`\n✅ Atelier — AI Website Builder running at http://localhost:${PORT}`);
   console.log('   Bring-your-own-key: visitors use a free Gemini key or an Anthropic key.\n');
 });

@@ -3,114 +3,252 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AI Site Builder</title>
+<title>Atelier — Build your website with an AI agent</title>
+<meta name="description" content="Atelier is an AI website builder. Describe your site and an AI agent builds it, page by page. Start free, add marketing tools, take the course, and buy your domain — all in one place.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%236c5ce7'/%3E%3Cpath%20d='M16%207l5%209-5%209-5-9z'%20fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="landing.css">
 </head>
-<body>
+<body class="landing">
 
-  <header class="topbar">
-    <div class="brand">
-      <span class="brand-mark">◆</span>
-      <span>AI Site Builder</span>
+  <!-- Nav -->
+  <nav class="nav">
+    <div class="wrap nav-inner">
+      <a class="brand" href="index.html" style="text-decoration:none">
+        <span class="brand-mark">◆</span>
+        <span class="brand-name">Atelier</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#addons">Add-ons</a>
+        <a href="#domain">Domains</a>
+        <a class="btn btn-primary" href="app.html">Start building →</a>
+      </div>
     </div>
-    <div class="topbar-actions">
-      <span id="key-status" class="key-status" hidden>🔑 Key set</span>
-      <button id="key-btn" class="ghost-btn" title="Set your Anthropic API key">API key</button>
-      <button id="new-btn" class="ghost-btn" title="Start a new website">New site</button>
+  </nav>
+
+  <!-- Hero -->
+  <header class="hero wrap">
+    <span class="eyebrow">✦ Your AI agent builds the whole site</span>
+    <h1>Describe your website.<br><span class="grad">The AI agent builds it.</span></h1>
+    <p class="sub">
+      Atelier is an AI website builder where an autonomous agent designs, writes,
+      and wires up a real multi-page site for you — then keeps editing it as you
+      chat. Start free. When you’re ready, add marketing tools, learn from the
+      course, and connect your own domain.
+    </p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="app.html">Start building — it’s free</a>
+      <a class="btn btn-ghost btn-lg" href="#how">See how it works</a>
+    </div>
+    <p class="hero-note">No signup to try · Free token allowance · Bring your own AI key for unlimited use</p>
+
+    <!-- Product mock -->
+    <div class="mock">
+      <div class="mock-bar"><i></i><i></i><i></i><span>atelier — workspace</span></div>
+      <div class="mock-body">
+        <div class="mock-chat">
+          <div class="bubble u">Build a landing page for my bakery, warm colors, with a menu and contact form.</div>
+          <div class="bubble a">Done! I created index.html, styles.css and a menu page. Want online ordering next?</div>
+          <div class="bubble u">Add a dark mode toggle.</div>
+          <div class="bubble a">Added a toggle in the header — it remembers your choice.</div>
+        </div>
+        <div class="mock-prev">
+          <h4>Sunrise Bakery</h4>
+          <p>Fresh sourdough, pastries & coffee — baked every morning.</p>
+          <span class="pill">Order online</span>
+          <div class="grid3"><div class="card"></div><div class="card"></div><div class="card"></div></div>
+        </div>
+      </div>
     </div>
   </header>
 
-  <!-- Bring-your-own-key panel. The key lives only in this browser. -->
-  <div id="key-panel" class="key-panel" hidden>
-    <div class="key-panel-inner">
-      <h2>Add an AI key to start</h2>
-      <p>
-        Paste a <strong>free Google Gemini key</strong> (recommended — no credit
-        card, no expiry) or an Anthropic key. The key is saved
-        <strong>only in this browser</strong> and sent straight to the AI
-        provider for your requests. It’s never stored on the server.
-      </p>
-      <label for="key-input">Gemini key (AIza…) or Anthropic key (sk-ant-…)</label>
-      <input
-        id="key-input"
-        type="password"
-        autocomplete="off"
-        spellcheck="false"
-        placeholder="AIza… or sk-ant-…"
-      />
-      <p id="key-error" class="error-msg" hidden></p>
-      <div class="key-panel-buttons">
-        <a class="key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free Gemini key ↗</a>
-        <a class="key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic key ↗</a>
-        <span class="spacer"></span>
-        <button id="key-clear" class="ghost-btn" hidden>Remove key</button>
-        <button id="key-save" class="primary-btn">Save key</button>
+  <!-- Features -->
+  <section class="block wrap" id="features">
+    <div class="section-head">
+      <h2>An agent that actually ships websites</h2>
+      <p>Not a template gallery. A real builder that writes real, downloadable code — and keeps improving it as you talk.</p>
+    </div>
+    <div class="features">
+      <div class="feature"><div class="ic">🤖</div><h3>Autonomous AI agent</h3><p>Give it a goal in plain English. It plans the pages, writes the HTML, CSS and JavaScript, and edits in place on every follow-up.</p></div>
+      <div class="feature"><div class="ic">🗂️</div><h3>Real multi-file projects</h3><p>Multiple pages, shared stylesheets and scripts — a proper project you can browse in the file explorer, not one locked-in blob.</p></div>
+      <div class="feature"><div class="ic">👁️</div><h3>Live preview + code</h3><p>Watch the site update instantly. Flip to the editor to tweak anything by hand; the agent picks up your edits next turn.</p></div>
+      <div class="feature"><div class="ic">⬇️</div><h3>You own the code</h3><p>Download the whole project as a .zip and host it anywhere. No lock-in, no proprietary runtime, no surprises.</p></div>
+      <div class="feature"><div class="ic">⚡</div><h3>Start free, pay as you grow</h3><p>A free token allowance gets you going. Upgrade for more capacity, or bring your own AI key for unlimited building.</p></div>
+      <div class="feature"><div class="ic">💾</div><h3>Instant, no signup</h3><p>Your projects save right in your browser. Come back anytime — no account required to start creating.</p></div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="block wrap" id="how">
+    <div class="section-head">
+      <h2>From idea to live site in four steps</h2>
+      <p>The agent does the heavy lifting — you stay in the driver’s seat.</p>
+    </div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><h4>Describe it</h4><p>Tell the agent what you want: the business, the vibe, the pages.</p></div>
+      <div class="step"><div class="n">2</div><h4>Agent builds</h4><p>It generates a complete multi-page site and shows a live preview.</p></div>
+      <div class="step"><div class="n">3</div><h4>Refine by chat</h4><p>“Make it bolder”, “add pricing”, “wire the form” — it edits in place.</p></div>
+      <div class="step"><div class="n">4</div><h4>Launch</h4><p>Download the code or connect a domain and go live.</p></div>
+    </div>
+  </section>
+
+  <!-- Pricing -->
+  <section class="block wrap" id="pricing">
+    <div class="section-head">
+      <h2>Simple, usage-based pricing</h2>
+      <p>The AI agent runs on tokens. Start with a free allowance — pay only when you need more.</p>
+    </div>
+    <div class="pricing">
+      <div class="tier">
+        <h3>Free</h3>
+        <div class="price">$0</div>
+        <p class="blurb">Try the agent and build your first site.</p>
+        <ul>
+          <li>Free monthly token allowance</li>
+          <li>Multi-file projects &amp; live preview</li>
+          <li>Download your code as .zip</li>
+          <li>Or bring your own key — unlimited</li>
+        </ul>
+        <a class="btn btn-ghost" href="app.html">Start free</a>
+      </div>
+      <div class="tier pop">
+        <span class="flag">Most popular</span>
+        <h3>Pro</h3>
+        <div class="price">$12<span>/mo</span></div>
+        <p class="blurb">For makers shipping real projects.</p>
+        <ul>
+          <li>2,000,000 tokens / month</li>
+          <li>Unlimited projects</li>
+          <li>Priority agent &amp; faster builds</li>
+          <li>Hosting handoff guides</li>
+        </ul>
+        <a class="btn btn-primary" id="buy-pro" href="app.html">Go Pro</a>
+      </div>
+      <div class="tier">
+        <h3>Studio</h3>
+        <div class="price">$39<span>/mo</span></div>
+        <p class="blurb">Everything to launch &amp; market.</p>
+        <ul>
+          <li>10,000,000 tokens / month</li>
+          <li>Marketing toolkit included</li>
+          <li>The full launch course</li>
+          <li>1 free domain for a year</li>
+        </ul>
+        <a class="btn btn-primary" id="buy-studio" href="app.html">Get Studio</a>
       </div>
     </div>
-  </div>
+  </section>
 
-  <main class="layout">
-    <!-- Left: the conversation with the agent -->
-    <section class="chat-pane">
-      <div id="messages" class="messages">
-        <div class="msg agent intro">
-          <p>Hi! Describe the website you want and I’ll build it. Then just keep
-             chatting to tune it — “make the header darker”, “add a pricing
-             section”, “use a playful font”, and so on.</p>
-          <button class="load-example">✨ See an example site →</button>
-          <p class="examples-or">…or describe your own:</p>
-          <div class="examples">
-            <button class="example-chip" data-text="A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form.">Coffee shop</button>
-            <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
-            <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
-          </div>
-        </div>
+  <!-- Add-ons -->
+  <section class="block wrap" id="addons">
+    <div class="section-head">
+      <h2>Everything to launch &amp; grow</h2>
+      <p>Atelier isn’t just a builder — it’s your launch kit. Add what you need.</p>
+    </div>
+    <div class="addons">
+      <div class="addon">
+        <div class="ic">📈</div>
+        <h3>Marketing toolkit</h3>
+        <div class="price-sm">from $9/mo</div>
+        <p>AI-written ad copy, SEO meta tags, social posts, an email capture form, and analytics-ready markup baked into your site. Turn a website into a campaign.</p>
+        <a class="btn btn-primary" id="buy-marketing" href="#">Add marketing tools</a>
       </div>
+      <div class="addon">
+        <div class="ic">🎓</div>
+        <h3>Launch course</h3>
+        <div class="price-sm">$49 one-time</div>
+        <p>“Build &amp; Launch Your Website” — a step-by-step course on design, copywriting, SEO, and getting your first 1,000 visitors, with worked examples in Atelier.</p>
+        <a class="btn btn-primary" id="buy-course" href="course.html">View the course</a>
+      </div>
+      <div class="addon">
+        <div class="ic">🌐</div>
+        <h3>Your own domain</h3>
+        <div class="price-sm">from $9.99/yr</div>
+        <p>Search and register a custom domain, then point it at your site for full control. Your brand, your address — no “.atelier.app” subdomain required.</p>
+        <a class="btn btn-primary" href="#domain">Find a domain</a>
+      </div>
+    </div>
+  </section>
 
-      <form id="composer" class="composer">
-        <textarea
-          id="prompt-input"
-          placeholder="Describe your website, or ask for a change…"
-          rows="2"
-        ></textarea>
-        <button id="send-btn" type="submit">
-          <span id="btn-label">Send</span>
-        </button>
+  <!-- Domain search -->
+  <section class="block wrap" id="domain">
+    <div class="section-head">
+      <h2>Claim your domain</h2>
+      <p>Search for the perfect name and make the website truly yours.</p>
+    </div>
+    <div class="domain-box">
+      <form class="domain-form" id="domain-form" autocomplete="off">
+        <input id="domain-input" type="text" placeholder="yourbrand.com" aria-label="Domain to search" />
+        <button class="btn btn-primary" type="submit">Search</button>
       </form>
-      <p id="error-msg" class="error-msg" hidden></p>
-      <p class="hint">Enter to send · Shift+Enter for a new line</p>
-    </section>
+      <p class="domain-tlds">Popular: .com · .io · .co · .app · .dev · .store</p>
+      <div class="domain-result" id="domain-result"></div>
+    </div>
+  </section>
 
-    <!-- Right: the live preview of the website being built -->
-    <section class="preview-pane">
-      <div class="preview-toolbar">
-        <span class="preview-label">Live preview</span>
-        <div class="toolbar-actions">
-          <button id="open-btn" class="ghost-btn" disabled>Open in tab</button>
-          <button id="download-btn" class="ghost-btn" disabled>Download HTML</button>
-        </div>
-      </div>
-      <div id="preview-frame-wrap">
-        <!-- Sandboxed WITHOUT allow-same-origin on purpose: the generated page's
-             scripts run in an opaque origin, so they can't reach this app's
-             localStorage (where the visitor's API key is kept) or cookies. -->
-        <iframe
-          id="preview-frame"
-          title="Generated website preview"
-          sandbox="allow-scripts allow-popups allow-forms allow-modals"
-        ></iframe>
-        <div id="placeholder" class="placeholder">
-          <p>Your website will appear here as the agent builds it.</p>
-        </div>
-        <div id="preview-loading" class="preview-loading" hidden>
-          <div class="spinner"></div>
-          <p>The agent is working…</p>
-        </div>
-      </div>
-    </section>
-  </main>
+  <!-- Final CTA -->
+  <section class="wrap">
+    <div class="cta-final">
+      <h2>Your website is one sentence away</h2>
+      <p>Describe it. Watch the agent build it. Launch it today.</p>
+      <a class="btn btn-primary btn-lg" href="app.html">Start building free →</a>
+    </div>
+  </section>
 
-  <script src="app.js"></script>
+  <footer>
+    <div class="wrap footer-inner">
+      <span>◆ Atelier — AI Website Builder</span>
+      <span>
+        <a href="app.html">Workspace</a> ·
+        <a href="course.html">Course</a> ·
+        <a href="#pricing">Pricing</a> ·
+        <a href="#domain">Domains</a>
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    // Wire purchase / add-on links from server config (Stripe payment links,
+    // course link, marketing link, domain registrar). Falls back gracefully if
+    // the static page is served without the backend.
+    (async function () {
+      let cfg = {};
+      try { const r = await fetch('/api/config'); if (r.ok) cfg = await r.json(); } catch (e) {}
+      const set = (id, url) => { const el = document.getElementById(id); if (el && url) el.href = url; };
+      set('buy-pro', cfg.stripeProLink);
+      set('buy-studio', cfg.stripeStudioLink);
+      set('buy-marketing', cfg.marketingLink);
+      if (cfg.courseLink) set('buy-course', cfg.courseLink);
+
+      // Domain search. If a registrar/affiliate search link is configured we
+      // hand off to it; otherwise we show a friendly mock-availability result
+      // and a link out to a registrar so the flow is never a dead end.
+      const form = document.getElementById('domain-form');
+      const input = document.getElementById('domain-input');
+      const out = document.getElementById('domain-result');
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        let q = (input.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (!q) return;
+        if (!/\.[a-z]{2,}$/.test(q)) q += '.com';
+        if (cfg.domainSearchLink) {
+          const url = cfg.domainSearchLink.replace('{domain}', encodeURIComponent(q));
+          window.open(url, '_blank', 'noopener');
+          out.innerHTML = 'Opening domain search for <strong>' + q + '</strong>…';
+          return;
+        }
+        // Demo availability: deterministic, just so the UI is alive without a
+        // registrar API. Replace by setting DOMAIN_SEARCH_LINK on the server.
+        const available = (q.length % 2) === 0;
+        const registrar = 'https://www.namecheap.com/domains/registration/results/?domain=' + encodeURIComponent(q);
+        out.innerHTML = available
+          ? '<span class="ok">✓ ' + q + ' looks available!</span> — <a href="' + registrar + '" target="_blank" rel="noopener">register it ↗</a>'
+          : '<span class="no">✗ ' + q + ' may be taken.</span> — <a href="' + registrar + '" target="_blank" rel="noopener">check alternatives ↗</a>';
+      });
+    })();
+  </script>
 </body>
 </html>
