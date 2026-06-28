@@ -100,13 +100,43 @@ keyPanel.addEventListener('click', (e) => {
   if (e.target === keyPanel) closeKeyPanel();
 });
 
-// ---------------- Example chips (event-delegated) ----------------
+// ---------------- Intro buttons (event-delegated) ----------------
 messagesEl.addEventListener('click', (e) => {
   const chip = e.target.closest('.example-chip');
-  if (!chip) return;
-  promptInput.value = chip.dataset.text;
-  promptInput.focus();
+  if (chip) {
+    promptInput.value = chip.dataset.text;
+    promptInput.focus();
+    return;
+  }
+  if (e.target.closest('.load-example')) {
+    loadExample();
+  }
 });
+
+// Load a real, pre-built sample site into the preview so you can see (and
+// open/download) an actual website immediately — no key required just to look.
+// It's also seeded as the "current" site, so once a key is added you can tune
+// THIS site by chatting (e.g. "make it dark mode", "change the name").
+async function loadExample() {
+  try {
+    const res = await fetch('examples/coffee-shop.html');
+    if (!res.ok) throw new Error('fetch failed');
+    const html = await res.text();
+    removeIntro();
+    addMessage(
+      'agent',
+      'Here’s an example: a coffee shop landing page. Open or download it below — ' +
+        'or add your API key and ask me to change anything (colors, text, sections, layout).'
+    );
+    latestHtml = html;
+    renderPreview(html);
+    downloadBtn.disabled = false;
+    openBtn.disabled = false;
+  } catch (err) {
+    console.error(err);
+    showError('Could not load the example. Try again.');
+  }
+}
 
 // ---------------- Send ----------------
 composer.addEventListener('submit', (e) => {
@@ -206,6 +236,8 @@ function startOver() {
   intro.innerHTML = `
     <p>Fresh start! Describe the website you want and I’ll build it, then keep
        chatting to tune it.</p>
+    <button class="load-example">✨ See an example site →</button>
+    <p class="examples-or">…or describe your own:</p>
     <div class="examples">
       <button class="example-chip" data-text="A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form.">Coffee shop</button>
       <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>

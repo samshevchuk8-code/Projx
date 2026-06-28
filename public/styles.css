@@ -253,8 +253,30 @@ body {
   max-width: 100%;
 }
 
+.load-example {
+  margin-top: 14px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.load-example:hover {
+  background: var(--accent-hover);
+}
+
+.examples-or {
+  margin: 14px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
 .examples {
-  margin-top: 12px;
+  margin-top: 8px;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
