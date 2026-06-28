@@ -1,0 +1,16 @@
+{
+  "name": "ai-site-builder",
+  "version": "1.0.0",
+  "description": "A website that uses the Claude API to generate websites from a text description",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "@anthropic-ai/sdk": "^0.32.1"
+  }
+}
