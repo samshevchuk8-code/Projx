@@ -6,11 +6,16 @@ const Anthropic = require('@anthropic-ai/sdk');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// This app is "bring your own key": each visitor supplies their OWN Anthropic
-// API key from the browser, and it's used only to make that one request. The
-// server holds no key of its own, so visitors can never spend your credits.
-// The key is read from a request header, used once, and never stored or logged.
+// This app is "bring your own key": each visitor supplies their OWN AI key
+// from the browser, used only for that one request. The server holds no key of
+// its own, so visitors can never spend your credits. The key is read from a
+// request header, used once, and never stored or logged.
+//
+// Two providers are supported, auto-detected from the key's shape:
+//   - Anthropic (Claude) — keys start with "sk-ant-"  (paid / free trial credit)
+//   - Google Gemini      — keys start with "AIza"      (permanently free tier)
 const MODEL = process.env.MODEL || 'claude-sonnet-4-6';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 // Behind a host's load balancer (Render, Railway, Fly, etc.) the client IP
 // arrives in X-Forwarded-For. Trust it so the rate limiter buckets per real
@@ -44,10 +49,13 @@ function getUserKey(req) {
   return typeof header === 'string' ? header.trim() : '';
 }
 
-function looksLikeKey(key) {
-  // Anthropic keys start with "sk-ant-". We only sanity-check the shape so we
-  // can give a clear error; the real validation is Anthropic rejecting it.
-  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key);
+// Figure out which provider a key belongs to from its shape. We only sanity-
+// check the prefix so we can give a clear error; the real validation is the
+// provider accepting or rejecting it.
+function detectProvider(key) {
+  if (/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key)) return 'anthropic';
+  if (/^AIza[A-Za-z0-9_-]{30,}$/.test(key)) return 'gemini';
+  return null;
 }
 
 // The agent returns a short, human reply AND the full website on every turn.
@@ -131,6 +139,65 @@ function splitReplyAndHtml(raw) {
   return { reply, html };
 }
 
+// --- Provider calls ---------------------------------------------------------
+// Each takes the visitor's key + the sanitised conversation and returns the
+// model's raw text. On failure they throw an error carrying `.status` and
+// `.providerMessage` so the one catch block below can speak for both providers.
+
+async function callAnthropic(apiKey, convo) {
+  // Client is built per-request from the visitor's key and discarded.
+  const anthropic = new Anthropic({ apiKey });
+  const message = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 16000,
+    system: SYSTEM_PROMPT,
+    messages: convo,
+  });
+  const textBlock = message.content.find((block) => block.type === 'text');
+  return textBlock ? textBlock.text : '';
+}
+
+async function callGemini(apiKey, convo) {
+  // Gemini uses role "model" instead of "assistant", and a separate
+  // system_instruction. thinkingBudget:0 keeps the whole output budget for the
+  // HTML so a long page doesn't get truncated by the model's internal thinking.
+  const contents = convo.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents,
+        generationConfig: {
+          maxOutputTokens: 32000,
+          temperature: 1,
+          thinkingConfig: { thinkingBudget: 0 },
+        },
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    let body = null;
+    try { body = await res.json(); } catch (e) { /* non-JSON error body */ }
+    const err = new Error('Gemini request failed');
+    err.status = res.status;
+    err.providerMessage = (body && body.error && body.error.message) || '';
+    throw err;
+  }
+
+  const data = await res.json();
+  const cand = data.candidates && data.candidates[0];
+  const parts = cand && cand.content && cand.content.parts;
+  return Array.isArray(parts) ? parts.map((p) => p.text || '').join('') : '';
+}
+
 app.post('/api/chat', async (req, res) => {
   const ip = req.ip || req.connection.remoteAddress || 'unknown';
   if (rateLimited(ip)) {
@@ -140,13 +207,14 @@ app.post('/api/chat', async (req, res) => {
   const userKey = getUserKey(req);
   if (!userKey) {
     return res.status(401).json({
-      error: 'Add your Anthropic API key to start building. It stays in your browser and is used only for your own requests.',
+      error: 'Add an AI key to start building. It stays in your browser and is used only for your own requests.',
       code: 'NO_KEY',
     });
   }
-  if (!looksLikeKey(userKey)) {
+  const provider = detectProvider(userKey);
+  if (!provider) {
     return res.status(401).json({
-      error: 'That doesn’t look like a valid Anthropic API key (they start with "sk-ant-").',
+      error: 'That doesn’t look like a valid key. Use a free Google Gemini key ("AIza…") or an Anthropic key ("sk-ant-…").',
       code: 'BAD_KEY',
     });
   }
@@ -188,79 +256,82 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    // Build a client from THIS visitor's key. Created per-request and discarded;
-    // the key is never persisted server-side.
-    const anthropic = new Anthropic({ apiKey: userKey });
+    const rawText =
+      provider === 'gemini'
+        ? await callGemini(userKey, convo)
+        : await callAnthropic(userKey, convo);
 
-    const message = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      system: SYSTEM_PROMPT,
-      messages: convo,
-    });
-
-    const textBlock = message.content.find((block) => block.type === 'text');
-    const { reply, html } = splitReplyAndHtml(textBlock ? textBlock.text : '');
-
+    const { reply, html } = splitReplyAndHtml(rawText);
     res.json({ reply, html });
   } catch (err) {
-    // Pull the real reason out of the Anthropic error so the visitor can act on
+    // Pull the real reason out of the provider error so the visitor can act on
     // it, instead of hiding everything behind a generic "failed" message.
     const status = err && err.status;
     const apiType = err && err.error && err.error.error && err.error.error.type;
-    const apiMsg = (err && err.error && err.error.error && err.error.error.message) || '';
+    const apiMsg =
+      (err && err.providerMessage) ||
+      (err && err.error && err.error.error && err.error.error.message) ||
+      '';
 
     // Log only status/type/message — never the raw error (it can echo request
     // data) and never the key (it travels in a header, not in these fields).
-    console.error('Claude API error:', status, apiType, apiMsg);
+    console.error('AI provider error:', provider, status, apiType, apiMsg);
 
-    // Out of credit / billing not set up — the most common first-run failure.
+    // An invalid/expired key. Anthropic returns 401/403; Gemini returns 400
+    // with an "API key not valid" message — catch that here, before the
+    // generic 400 branch, so it reads as a key problem, not a request problem.
+    const badKeyMsg = /api[\s_]?key not valid|api_key_invalid|invalid api key|invalid x-api-key|permission/i;
+    if (status === 401 || status === 403 || (status === 400 && badKeyMsg.test(apiMsg))) {
+      return res.status(401).json({
+        error: 'Your API key was rejected. Check that the key is correct and still active.',
+        code: 'KEY_REJECTED',
+      });
+    }
+
+    // Anthropic only: out of credit / billing not set up. (Gemini's free tier
+    // has no credit concept — it never hits this.)
     if (status === 400 && /credit|billing|too low/i.test(apiMsg)) {
       return res.status(402).json({
         error:
           'Your Anthropic account has no credit. Add billing or claim the free trial credit at ' +
-          'console.anthropic.com (Settings → Billing), then try again.',
+          'console.anthropic.com — or switch to a free Google Gemini key instead.',
         code: 'NO_CREDIT',
-      });
-    }
-
-    if (status === 401 || status === 403) {
-      return res.status(401).json({
-        error: 'Your Anthropic API key was rejected. Check that the key is correct and still active.',
-        code: 'KEY_REJECTED',
       });
     }
 
     if (status === 429) {
       return res.status(429).json({
-        error: 'Anthropic rate-limited your key. Wait a moment and try again.',
+        error:
+          provider === 'gemini'
+            ? 'You hit Google’s free-tier limit for now. Wait a minute and try again.'
+            : 'Anthropic rate-limited your key. Wait a moment and try again.',
       });
     }
 
     if (status === 400) {
       // Surface the actual validation message rather than a vague failure.
       return res.status(400).json({
-        error: apiMsg ? `Anthropic rejected the request: ${apiMsg}` : 'The request was invalid.',
+        error: apiMsg ? `The AI provider rejected the request: ${apiMsg}` : 'The request was invalid.',
       });
     }
 
     if (status === 529 || (status >= 500 && status <= 599)) {
       return res.status(502).json({
-        error: 'Anthropic is temporarily overloaded. Wait a moment and try again.',
+        error: 'The AI provider is temporarily overloaded. Wait a moment and try again.',
       });
     }
 
-    // Unknown failure (often a network/timeout reaching Anthropic). Include any
-    // message we have so it isn't a dead end.
+    // Unknown failure (often a network/timeout reaching the provider). Include
+    // any message we have so it isn't a dead end.
     res.status(502).json({
       error: apiMsg
         ? `The AI agent failed: ${apiMsg}`
-        : 'The AI agent could not reach Anthropic. Check your connection and try again.',
+        : 'The AI agent could not reach the provider. Check your connection and try again.',
     });
   }
 });
 
 app.listen(PORT, () => {
   console.log(`\n✅ AI Site Builder running at http://localhost:${PORT}`);
-  console.log('   Bring-your-own-key: visitors supply their own Anthropic key.\n');
+  console.log('   Bring-your-own-key: visitors use a free Gemini key or an Anthropic key.\n');
 });
