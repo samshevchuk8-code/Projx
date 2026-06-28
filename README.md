@@ -133,6 +133,47 @@ Create Stripe **Payment Links** in the Stripe dashboard for the plans, paste the
 URLs here, and the buttons go live. The domain search falls back to a demo
 availability check + a registrar link if `DOMAIN_SEARCH_LINK` is unset.
 
+## Your own AI endpoint (API gateway)
+
+The app can expose **your own AI API** — an OpenAI-compatible endpoint at `/v1`,
+protected by API keys you issue, backed by the model behind `SERVER_AI_KEY`
+(e.g. a free Gemini key). Point any OpenAI SDK/tool at it by changing the base
+URL. It needs `SERVER_AI_KEY` set, and auto-enables when it is.
+
+Set the keys callers must present:
+
+```
+SERVER_AI_KEY=AIza...                 # the backing model (free Gemini works)
+GATEWAY_KEYS=atl_live_yourkey         # comma-separated keys you accept
+```
+
+(If you enable it with no `GATEWAY_KEYS`, a random key is generated and printed
+to the logs at startup.)
+
+**Endpoints** (all require `Authorization: Bearer <your gateway key>`):
+
+- `GET /v1/models` — list the served model.
+- `POST /v1/chat/completions` — OpenAI-compatible chat completion.
+- `POST /v1/generate` — simple `{ prompt | messages, system?, max_tokens? }` →
+  `{ text, tokens, model }`.
+
+Example:
+
+```bash
+curl https://YOUR-HOST/v1/chat/completions \
+  -H "Authorization: Bearer atl_live_yourkey" \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":"Write a haiku about the sea."}]}'
+```
+
+Use it from the OpenAI SDK by setting `baseURL` to `https://YOUR-HOST/v1` and
+`apiKey` to one of your `GATEWAY_KEYS`.
+
+> It's a **gateway**, not a model — it wraps whatever `SERVER_AI_KEY` points to.
+> Usage on the gateway draws on that backing key's quota; protect your gateway
+> keys and add per-key metering/billing (like the website builder has) before
+> exposing it widely.
+
 ## API
 
 - `GET /api/config` — non-secret client config (managed-agent on/off, free token

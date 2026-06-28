@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
@@ -288,13 +289,14 @@ function stripFence(s) {
 // model's raw text. On failure they throw an error carrying `.status` and
 // `.providerMessage` so the one catch block below can speak for both providers.
 
-async function callAnthropic(apiKey, convo) {
+async function callAnthropic(apiKey, convo, opts = {}) {
+  const { system = SYSTEM_PROMPT, maxTokens = 32000 } = opts;
   // Client is built per-request from the visitor's key and discarded.
   const anthropic = new Anthropic({ apiKey });
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 32000,
-    system: SYSTEM_PROMPT,
+    max_tokens: maxTokens,
+    system,
     messages: convo,
   });
   const textBlock = message.content.find((block) => block.type === 'text');
@@ -303,7 +305,8 @@ async function callAnthropic(apiKey, convo) {
   return { text: textBlock ? textBlock.text : '', tokens };
 }
 
-async function callGemini(apiKey, convo) {
+async function callGemini(apiKey, convo, opts = {}) {
+  const { system = SYSTEM_PROMPT, maxTokens = 48000 } = opts;
   // Gemini uses role "model" instead of "assistant", and a separate
   // system_instruction. thinkingBudget:0 keeps the whole output budget for the
   // files so a multi-page project doesn't get truncated by internal thinking.
@@ -318,10 +321,10 @@ async function callGemini(apiKey, convo) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        system_instruction: { parts: [{ text: system }] },
         contents,
         generationConfig: {
-          maxOutputTokens: 48000,
+          maxOutputTokens: maxTokens,
           temperature: 1,
           thinkingConfig: { thinkingBudget: 0 },
         },
@@ -574,7 +577,152 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
+// ===========================================================================
+// Your own AI API gateway  (OpenAI-compatible)
+// ---------------------------------------------------------------------------
+// This turns the app into YOUR AI endpoint: a branded API others (or you) can
+// call, protected by API keys you issue, backed by the model behind
+// SERVER_AI_KEY (e.g. a free Gemini key). It exposes the common OpenAI shape
+// so existing SDKs/tools work by just pointing their base URL here:
+//
+//   Base URL: https://<your-host>/v1
+//   Auth:     Authorization: Bearer <one of your GATEWAY_KEYS>
+//   Endpoints: GET /v1/models, POST /v1/chat/completions, POST /v1/generate
+//
+// It needs SERVER_AI_KEY to have a model to call. It is OFF unless enabled.
+// Set GATEWAY_KEYS to the key(s) you want to accept (comma-separated). If you
+// enable the gateway without setting any, a random key is generated at startup
+// and printed to the logs (it changes on restart until you set GATEWAY_KEYS).
+const GATEWAY_ENABLED =
+  process.env.GATEWAY_ENABLED != null ? process.env.GATEWAY_ENABLED === '1' : !!SERVER_AI_KEY;
+let GATEWAY_KEYS = (process.env.GATEWAY_KEYS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+let generatedGatewayKey = '';
+if (GATEWAY_ENABLED && GATEWAY_KEYS.length === 0) {
+  generatedGatewayKey = 'atl_' + crypto.randomBytes(24).toString('hex');
+  GATEWAY_KEYS = [generatedGatewayKey];
+}
+
+function gatewayModelId() {
+  const provider = detectProvider(SERVER_AI_KEY);
+  return provider === 'gemini' ? GEMINI_MODEL : MODEL;
+}
+
+// Timing-safe-ish check that the caller presented one of our issued keys.
+function gatewayAuthed(req) {
+  const h = req.get('authorization') || '';
+  const m = h.match(/^Bearer\s+(.+)$/i);
+  const token = (m ? m[1] : req.get('x-api-key') || '').trim();
+  if (!token) return false;
+  return GATEWAY_KEYS.some((k) =>
+    k.length === token.length &&
+    crypto.timingSafeEqual(Buffer.from(k), Buffer.from(token))
+  );
+}
+
+// OpenAI-style error body.
+function oaiErr(res, code, message, type) {
+  return res.status(code).json({ error: { message, type: type || 'invalid_request_error', code } });
+}
+
+// Run the backing model with an arbitrary system prompt + messages.
+async function gatewayComplete(convo, opts) {
+  const provider = detectProvider(SERVER_AI_KEY);
+  const o = { system: opts.system || 'You are a helpful assistant.', maxTokens: opts.maxTokens || 4096 };
+  return provider === 'gemini'
+    ? callGemini(SERVER_AI_KEY, convo, o)
+    : callAnthropic(SERVER_AI_KEY, convo, o);
+}
+
+// Split a messages array into a system string + a clean user/assistant convo.
+function splitSystem(messages) {
+  const sys = [];
+  const convo = [];
+  for (const m of Array.isArray(messages) ? messages : []) {
+    if (!m || typeof m.content !== 'string') continue;
+    if (m.role === 'system') sys.push(m.content);
+    else if (m.role === 'user' || m.role === 'assistant') convo.push({ role: m.role, content: m.content });
+  }
+  return { system: sys.join('\n\n'), convo };
+}
+
+if (GATEWAY_ENABLED) {
+  // Guard: the gateway can't work without a backing model key.
+  const gatewayGuard = (req, res, next) => {
+    if (!SERVER_AI_KEY) return oaiErr(res, 503, 'The AI gateway has no backing model configured (set SERVER_AI_KEY).', 'server_error');
+    if (!gatewayAuthed(req)) return oaiErr(res, 401, 'Invalid API key. Pass one of your gateway keys as a Bearer token.', 'invalid_request_error');
+    const ip = req.ip || 'unknown';
+    if (rateLimited(ip)) return oaiErr(res, 429, 'Rate limit exceeded. Slow down and retry.', 'rate_limit_error');
+    next();
+  };
+
+  // List available models (OpenAI shape).
+  app.get('/v1/models', gatewayGuard, (req, res) => {
+    const id = gatewayModelId();
+    res.json({ object: 'list', data: [{ id, object: 'model', owned_by: 'atelier' }] });
+  });
+
+  // OpenAI-compatible chat completions (non-streaming).
+  app.post('/v1/chat/completions', gatewayGuard, async (req, res) => {
+    const body = req.body || {};
+    const { system, convo } = splitSystem(body.messages);
+    if (!convo.length || convo[convo.length - 1].role !== 'user') {
+      return oaiErr(res, 400, 'messages must end with a user message.', 'invalid_request_error');
+    }
+    try {
+      const out = await gatewayComplete(convo, { system, maxTokens: body.max_tokens });
+      res.json({
+        id: 'chatcmpl_' + crypto.randomBytes(12).toString('hex'),
+        object: 'chat.completion',
+        created: Math.floor(Date.now() / 1000),
+        model: gatewayModelId(),
+        choices: [{ index: 0, message: { role: 'assistant', content: out.text }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: out.tokens },
+      });
+    } catch (err) {
+      console.error('gateway chat error:', err && err.status, err && (err.providerMessage || err.message));
+      oaiErr(res, 502, 'The backing model failed to respond.', 'server_error');
+    }
+  });
+
+  // Simpler, friendlier endpoint: { prompt | messages, system?, max_tokens? }.
+  app.post('/v1/generate', gatewayGuard, async (req, res) => {
+    const body = req.body || {};
+    let system = body.system || '';
+    let convo;
+    if (typeof body.prompt === 'string' && body.prompt.trim()) {
+      convo = [{ role: 'user', content: body.prompt.trim() }];
+    } else {
+      const split = splitSystem(body.messages);
+      system = system || split.system;
+      convo = split.convo;
+    }
+    if (!convo || !convo.length) return res.status(400).json({ error: 'Provide a "prompt" or "messages".' });
+    try {
+      const out = await gatewayComplete(convo, { system, maxTokens: body.max_tokens });
+      res.json({ text: out.text, tokens: out.tokens, model: gatewayModelId() });
+    } catch (err) {
+      console.error('gateway generate error:', err && err.status, err && (err.providerMessage || err.message));
+      res.status(502).json({ error: 'The backing model failed to respond.' });
+    }
+  });
+}
+
 app.listen(PORT, () => {
   console.log(`\n✅ Atelier — AI Website Builder running at http://localhost:${PORT}`);
-  console.log('   Bring-your-own-key: visitors use a free Gemini key or an Anthropic key.\n');
+  console.log('   Bring-your-own-key: visitors use a free Gemini key or an Anthropic key.');
+  if (GATEWAY_ENABLED && SERVER_AI_KEY) {
+    console.log(`\n🔌 Your AI API gateway is ON (OpenAI-compatible):`);
+    console.log(`   Base URL:  http://localhost:${PORT}/v1`);
+    console.log(`   Model:     ${gatewayModelId()}`);
+    if (generatedGatewayKey) {
+      console.log(`   API key:   ${generatedGatewayKey}`);
+      console.log('   (auto-generated — set GATEWAY_KEYS to keep a stable key across restarts)');
+    } else {
+      console.log('   API keys:  using your GATEWAY_KEYS');
+    }
+  } else if (GATEWAY_ENABLED) {
+    console.log('\n🔌 AI gateway requested but SERVER_AI_KEY is unset — set it to enable /v1.');
+  }
+  console.log('');
 });
