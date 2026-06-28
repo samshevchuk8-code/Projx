@@ -13,42 +13,56 @@
       <span class="brand-mark">◆</span>
       <span>AI Site Builder</span>
     </div>
+    <button id="new-btn" class="ghost-btn" title="Start a new website">New site</button>
   </header>
 
   <main class="layout">
-    <section class="composer">
-      <h1>Describe the website you want</h1>
-      <p class="subtitle">Be as specific as you like — business type, vibe, sections, colors.</p>
-
-      <textarea
-        id="prompt-input"
-        placeholder="e.g. A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form."
-        rows="6"
-      ></textarea>
-
-      <button id="generate-btn">
-        <span id="btn-label">Generate website</span>
-      </button>
-
-      <p id="error-msg" class="error-msg" hidden></p>
-
-      <div class="examples">
-        <span class="examples-label">Try:</span>
-        <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
-        <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
-        <button class="example-chip" data-text="A one-page site for a local bakery with a menu, hours, and location section. Pastel colors, playful font.">Bakery site</button>
+    <!-- Left: the conversation with the agent -->
+    <section class="chat-pane">
+      <div id="messages" class="messages">
+        <div class="msg agent intro">
+          <p>Hi! Describe the website you want and I’ll build it. Then just keep
+             chatting to tune it — “make the header darker”, “add a pricing
+             section”, “use a playful font”, and so on.</p>
+          <div class="examples">
+            <button class="example-chip" data-text="A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form.">Coffee shop</button>
+            <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
+            <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
+          </div>
+        </div>
       </div>
+
+      <form id="composer" class="composer">
+        <textarea
+          id="prompt-input"
+          placeholder="Describe your website, or ask for a change…"
+          rows="2"
+        ></textarea>
+        <button id="send-btn" type="submit">
+          <span id="btn-label">Send</span>
+        </button>
+      </form>
+      <p id="error-msg" class="error-msg" hidden></p>
+      <p class="hint">Enter to send · Shift+Enter for a new line</p>
     </section>
 
+    <!-- Right: the live preview of the website being built -->
     <section class="preview-pane">
       <div class="preview-toolbar">
         <span class="preview-label">Live preview</span>
-        <button id="download-btn" disabled>Download HTML</button>
+        <div class="toolbar-actions">
+          <button id="open-btn" class="ghost-btn" disabled>Open in tab</button>
+          <button id="download-btn" class="ghost-btn" disabled>Download HTML</button>
+        </div>
       </div>
       <div id="preview-frame-wrap">
         <iframe id="preview-frame" title="Generated website preview"></iframe>
         <div id="placeholder" class="placeholder">
-          <p>Your generated website will appear here.</p>
+          <p>Your website will appear here as the agent builds it.</p>
+        </div>
+        <div id="preview-loading" class="preview-loading" hidden>
+          <div class="spinner"></div>
+          <p>The agent is working…</p>
         </div>
       </div>
     </section>
