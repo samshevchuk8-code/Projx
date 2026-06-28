@@ -8,7 +8,6 @@ services:
     name: ai-site-builder
     runtime: node
     plan: free
-    branch: claude/ai-website-builder-w547xb
     buildCommand: npm install
     startCommand: npm start
     autoDeploy: true
