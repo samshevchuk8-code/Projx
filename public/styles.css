@@ -2,6 +2,13 @@
   box-sizing: border-box;
 }
 
+/* A class with `display:` set overrides the browser default for [hidden],
+   so the `hidden` attribute would silently stop working on the key panel and
+   loading overlay. Re-assert it. */
+[hidden] {
+  display: none !important;
+}
+
 :root {
   --bg: #0f1115;
   --panel: #171a21;
@@ -216,6 +223,12 @@ body {
 
 .msg p {
   margin: 0;
+}
+
+/* Preserve line breaks only in real chat turns (added via textContent),
+   not in the static intro markup, whose source indentation would otherwise
+   render as ragged wrapping. */
+.msg:not(.intro) p {
   white-space: pre-wrap;
 }
 
