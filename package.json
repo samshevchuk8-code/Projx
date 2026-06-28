@@ -1,7 +1,7 @@
 {
-  "name": "ai-site-builder",
-  "version": "1.0.0",
-  "description": "A website that uses the Claude API to generate websites from a text description",
+  "name": "atelier-ai-website-builder",
+  "version": "2.0.0",
+  "description": "Atelier — an AI website builder where an agent builds real multi-file sites for you. Freemium token metering, marketing toolkit, course, and domain flow.",
   "main": "server.js",
   "type": "commonjs",
   "engines": {

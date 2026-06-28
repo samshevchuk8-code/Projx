@@ -5,7 +5,7 @@
 # Render injects PORT automatically; server.js already reads process.env.PORT.
 services:
   - type: web
-    name: ai-site-builder
+    name: atelier-ai-website-builder
     runtime: node
     plan: free
     buildCommand: npm install
