@@ -24,24 +24,25 @@
   <!-- Bring-your-own-key panel. The key lives only in this browser. -->
   <div id="key-panel" class="key-panel" hidden>
     <div class="key-panel-inner">
-      <h2>Use your own Anthropic API key</h2>
+      <h2>Add an AI key to start</h2>
       <p>
-        This app is bring-your-own-key: you supply your own key so you build
-        on your own Anthropic credits — nobody else can spend them. The key is
-        saved <strong>only in this browser</strong> (localStorage) and sent
-        straight to Anthropic for your requests. It’s never stored on the server.
+        Paste a <strong>free Google Gemini key</strong> (recommended — no credit
+        card, no expiry) or an Anthropic key. The key is saved
+        <strong>only in this browser</strong> and sent straight to the AI
+        provider for your requests. It’s never stored on the server.
       </p>
-      <label for="key-input">Anthropic API key</label>
+      <label for="key-input">Gemini key (AIza…) or Anthropic key (sk-ant-…)</label>
       <input
         id="key-input"
         type="password"
         autocomplete="off"
         spellcheck="false"
-        placeholder="sk-ant-..."
+        placeholder="AIza… or sk-ant-…"
       />
       <p id="key-error" class="error-msg" hidden></p>
       <div class="key-panel-buttons">
-        <a class="key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key ↗</a>
+        <a class="key-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Get a free Gemini key ↗</a>
+        <a class="key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic key ↗</a>
         <span class="spacer"></span>
         <button id="key-clear" class="ghost-btn" hidden>Remove key</button>
         <button id="key-save" class="primary-btn">Save key</button>

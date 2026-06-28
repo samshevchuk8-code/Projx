@@ -6,8 +6,9 @@ pricing section", "use a more playful font". The agent rebuilds a single,
 self-contained HTML page on every turn and shows it in a live preview, with
 buttons to open it in a new tab or download the file.
 
-It's **bring-your-own-key**: every visitor enters their own Anthropic API key,
-so nobody can ever spend *your* credits. (See "API keys & credits" below.)
+It's **bring-your-own-key**: every visitor enters their own AI key — a **free
+Google Gemini key** or an Anthropic key — so nobody can ever spend *your*
+credits. (See "API keys & credits" below.)
 
 ## How it works
 
@@ -60,16 +61,21 @@ key, describe a site, and start tuning it.
 ## API keys & credits
 
 This app is **bring-your-own-key (BYOK)** so that hosting it publicly can't run
-up *your* Anthropic bill:
+up *your* bill. It supports **two AI providers**, auto-detected from the shape
+of the key the visitor pastes:
 
-- On first visit, the app prompts for an Anthropic API key. You can get one at
-  https://console.anthropic.com/settings/keys.
+| Provider | Key looks like | Cost |
+|----------|----------------|------|
+| **Google Gemini** (recommended) | `AIza…` | **Free tier** — no credit card, no expiry. Get one at https://aistudio.google.com/apikey |
+| **Anthropic (Claude)** | `sk-ant-…` | Pay-as-you-go (new accounts get ~$5 free after phone verification). Get one at https://console.anthropic.com/settings/keys |
+
+- On first visit, the app prompts for a key. Paste either kind.
 - The key is saved **only in that visitor's browser** (`localStorage`) and sent
   as the `x-anthropic-key` header with each request.
-- The server uses that key to build a fresh Anthropic client **per request** and
-  then discards it. It is **never written to disk, never logged** (error logs
-  record only a status code), and the server keeps no key of its own.
-- Each visitor therefore spends **their own** credits. Use "Change key" /
+- The server detects the provider, makes the call with that key **per request**,
+  and discards it. The key is **never written to disk, never logged** (error
+  logs record only a status code), and the server keeps no key of its own.
+- Each visitor therefore uses **their own** key/quota. Use "Change key" /
   "Remove key" in the header to update or clear it.
 
 > **Heads-up on hosting:** because the browser sends the key to your server,
@@ -131,9 +137,10 @@ ai-site-builder/
 
 - **No server-side API key.** Keys come from each visitor's browser (BYOK).
 - `PORT` (optional, default `3000`).
-- `MODEL` (optional, default `claude-sonnet-4-6`) — the Claude model the agent
-  uses. Sonnet is a good speed/quality balance for this; you can point it at a
-  more capable model if you want richer output.
+- `MODEL` (optional, default `claude-sonnet-4-6`) — the Claude model used when a
+  visitor pastes an Anthropic key.
+- `GEMINI_MODEL` (optional, default `gemini-2.5-flash`) — the Gemini model used
+  when a visitor pastes a free Google key.
 
 ## Notes on what's NOT included (on purpose, for a learning project)
 

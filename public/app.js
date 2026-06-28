@@ -40,7 +40,8 @@ function hasKey() {
 }
 
 function looksLikeKey(k) {
-  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k);
+  // Accept either a free Google Gemini key ("AIza…") or an Anthropic key.
+  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k) || /^AIza[A-Za-z0-9_-]{30,}$/.test(k);
 }
 
 function refreshKeyUi() {
@@ -70,7 +71,7 @@ function closeKeyPanel() {
 function saveKey() {
   const k = keyInput.value.trim();
   if (!looksLikeKey(k)) {
-    keyError.textContent = 'That doesn’t look like an Anthropic key (they start with "sk-ant-").';
+    keyError.textContent = 'That doesn’t look like a key. Use a free Google Gemini key ("AIza…") or an Anthropic key ("sk-ant-…").';
     keyError.hidden = false;
     return;
   }
