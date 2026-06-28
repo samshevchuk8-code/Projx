@@ -6,24 +6,18 @@ const Anthropic = require('@anthropic-ai/sdk');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('\n❌ Missing ANTHROPIC_API_KEY.');
-  console.error('   Copy .env.example to .env and add your key.\n');
-  process.exit(1);
-}
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
+// This app is "bring your own key": each visitor supplies their OWN Anthropic
+// API key from the browser, and it's used only to make that one request. The
+// server holds no key of its own, so visitors can never spend your credits.
+// The key is read from a request header, used once, and never stored or logged.
 const MODEL = process.env.MODEL || 'claude-sonnet-4-6';
 
 app.use(express.json({ limit: '4mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Very small in-memory rate limiter so one person can't hammer your API key.
-// Resets every minute. Fine for a learning project; swap for something
-// real (e.g. a Redis-backed limiter) before this ever goes to production.
+// Light in-memory rate limiter — just abuse protection so a single IP can't
+// hammer the endpoint. It does NOT protect your credits (visitors use their
+// own keys); that's what bring-your-own-key handles. Resets every minute.
 const RATE_LIMIT = 20; // requests per IP per minute
 const hits = new Map();
 function rateLimited(ip) {
@@ -37,6 +31,18 @@ function rateLimited(ip) {
   entry.count += 1;
   hits.set(ip, entry);
   return entry.count > RATE_LIMIT;
+}
+
+// Pull the visitor's key from the request. Never log this value.
+function getUserKey(req) {
+  const header = req.get('x-anthropic-key');
+  return typeof header === 'string' ? header.trim() : '';
+}
+
+function looksLikeKey(key) {
+  // Anthropic keys start with "sk-ant-". We only sanity-check the shape so we
+  // can give a clear error; the real validation is Anthropic rejecting it.
+  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(key);
 }
 
 // The agent returns a short, human reply AND the full website on every turn.
@@ -126,6 +132,20 @@ app.post('/api/chat', async (req, res) => {
     return res.status(429).json({ error: 'Too many requests. Wait a bit and try again.' });
   }
 
+  const userKey = getUserKey(req);
+  if (!userKey) {
+    return res.status(401).json({
+      error: 'Add your Anthropic API key to start building. It stays in your browser and is used only for your own requests.',
+      code: 'NO_KEY',
+    });
+  }
+  if (!looksLikeKey(userKey)) {
+    return res.status(401).json({
+      error: 'That doesn’t look like a valid Anthropic API key (they start with "sk-ant-").',
+      code: 'BAD_KEY',
+    });
+  }
+
   const { messages, currentHtml } = req.body || {};
 
   if (!Array.isArray(messages) || messages.length === 0) {
@@ -163,6 +183,10 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
+    // Build a client from THIS visitor's key. Created per-request and discarded;
+    // the key is never persisted server-side.
+    const anthropic = new Anthropic({ apiKey: userKey });
+
     const message = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 16000,
@@ -175,11 +199,26 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ reply, html });
   } catch (err) {
-    console.error('Claude API error:', err);
+    // Don't log the error verbatim — Anthropic errors can echo request data.
+    // Log only status/name so the visitor's key never lands in your logs.
+    console.error('Claude API error:', err && err.status, err && err.name);
+
+    if (err && (err.status === 401 || err.status === 403)) {
+      return res.status(401).json({
+        error: 'Your Anthropic API key was rejected. Check the key and your account credits.',
+        code: 'KEY_REJECTED',
+      });
+    }
+    if (err && err.status === 429) {
+      return res.status(429).json({
+        error: 'Anthropic rate-limited your key. Wait a moment and try again.',
+      });
+    }
     res.status(502).json({ error: 'The AI agent failed to respond. Please try again.' });
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`\n✅ AI Site Builder running at http://localhost:${PORT}\n`);
+  console.log(`\n✅ AI Site Builder running at http://localhost:${PORT}`);
+  console.log('   Bring-your-own-key: visitors supply their own Anthropic key.\n');
 });

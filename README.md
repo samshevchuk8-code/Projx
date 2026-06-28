@@ -6,6 +6,9 @@ pricing section", "use a more playful font". The agent rebuilds a single,
 self-contained HTML page on every turn and shows it in a live preview, with
 buttons to open it in a new tab or download the file.
 
+It's **bring-your-own-key**: every visitor enters their own Anthropic API key,
+so nobody can ever spend *your* credits. (See "API keys & credits" below.)
+
 ## How it works
 
 It's a conversational loop, not a one-shot generator:
@@ -39,15 +42,11 @@ refining.
 
 ```bash
 npm install
-cp .env.example .env
 ```
 
-Open `.env` and add your real Anthropic API key (get one at
-https://console.anthropic.com/settings/keys):
-
-```
-ANTHROPIC_API_KEY=sk-ant-...
-```
+That's it — the server needs no API key of its own. (`.env` is optional and
+only used for `PORT` / `MODEL`; copy `.env.example` to `.env` if you want to
+change those.)
 
 ## Run it
 
@@ -55,7 +54,31 @@ ANTHROPIC_API_KEY=sk-ant-...
 npm start
 ```
 
-Then open http://localhost:3000, describe a site, and start tuning it.
+Then open http://localhost:3000. On first load it asks for your Anthropic API
+key, describe a site, and start tuning it.
+
+## API keys & credits
+
+This app is **bring-your-own-key (BYOK)** so that hosting it publicly can't run
+up *your* Anthropic bill:
+
+- On first visit, the app prompts for an Anthropic API key. You can get one at
+  https://console.anthropic.com/settings/keys.
+- The key is saved **only in that visitor's browser** (`localStorage`) and sent
+  as the `x-anthropic-key` header with each request.
+- The server uses that key to build a fresh Anthropic client **per request** and
+  then discards it. It is **never written to disk, never logged** (error logs
+  record only a status code), and the server keeps no key of its own.
+- Each visitor therefore spends **their own** credits. Use "Change key" /
+  "Remove key" in the header to update or clear it.
+
+> **Heads-up on hosting:** because the browser sends the key to your server,
+> which forwards it to Anthropic, always serve this over **HTTPS** in
+> production so the key isn't exposed in transit. The server is a thin proxy and
+> stores nothing, but it does see the key in memory for the duration of the
+> request — that's inherent to any BYOK proxy. If you'd rather the key never
+> touch your server at all, you'd move the Anthropic call into the browser, at
+> the cost of exposing request internals client-side.
 
 ## Project structure
 
@@ -72,7 +95,7 @@ ai-site-builder/
 
 ## Configuration
 
-- `ANTHROPIC_API_KEY` (required) — your Anthropic key.
+- **No server-side API key.** Keys come from each visitor's browser (BYOK).
 - `PORT` (optional, default `3000`).
 - `MODEL` (optional, default `claude-sonnet-4-6`) — the Claude model the agent
   uses. Sonnet is a good speed/quality balance for this; you can point it at a
@@ -83,14 +106,13 @@ ai-site-builder/
 - **No database.** Conversations and generated sites aren't saved — refresh the
   page and it's gone. Add persistence (SQLite/Postgres) if you want people to
   come back to past sites.
-- **No auth/accounts.** Anyone who can reach the server can use your API
-  credits. There's a tiny in-memory rate limiter (20 requests/minute per IP) in
-  `server.js` to take the edge off while testing locally, but it resets on
-  restart and won't hold up under real traffic.
+- **No accounts.** Anyone who can reach the server can use the app, but they
+  use *their own* key/credits (BYOK), not yours. There's also a tiny in-memory
+  rate limiter (20 requests/minute per IP) in `server.js` as basic abuse
+  protection; it resets on restart and won't hold up under real traffic.
 - **No deployment config.** This runs locally. To put it online, deploy the
-  Node app (Render, Railway, Fly.io, a VPS, etc.) and set `ANTHROPIC_API_KEY`
-  as an environment variable there — never commit your real key or ship it to
-  the browser.
+  Node app (Render, Railway, Fly.io, a VPS, etc.) over HTTPS. You don't need to
+  set any API key on the server — visitors bring their own.
 
 ## Where to go next
 

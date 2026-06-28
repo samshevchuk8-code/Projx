@@ -13,8 +13,40 @@
       <span class="brand-mark">◆</span>
       <span>AI Site Builder</span>
     </div>
-    <button id="new-btn" class="ghost-btn" title="Start a new website">New site</button>
+    <div class="topbar-actions">
+      <span id="key-status" class="key-status" hidden>🔑 Key set</span>
+      <button id="key-btn" class="ghost-btn" title="Set your Anthropic API key">API key</button>
+      <button id="new-btn" class="ghost-btn" title="Start a new website">New site</button>
+    </div>
   </header>
+
+  <!-- Bring-your-own-key panel. The key lives only in this browser. -->
+  <div id="key-panel" class="key-panel" hidden>
+    <div class="key-panel-inner">
+      <h2>Use your own Anthropic API key</h2>
+      <p>
+        This app is bring-your-own-key: you supply your own key so you build
+        on your own Anthropic credits — nobody else can spend them. The key is
+        saved <strong>only in this browser</strong> (localStorage) and sent
+        straight to Anthropic for your requests. It’s never stored on the server.
+      </p>
+      <label for="key-input">Anthropic API key</label>
+      <input
+        id="key-input"
+        type="password"
+        autocomplete="off"
+        spellcheck="false"
+        placeholder="sk-ant-..."
+      />
+      <p id="key-error" class="error-msg" hidden></p>
+      <div class="key-panel-buttons">
+        <a class="key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Get a key ↗</a>
+        <span class="spacer"></span>
+        <button id="key-clear" class="ghost-btn" hidden>Remove key</button>
+        <button id="key-save" class="primary-btn">Save key</button>
+      </div>
+    </div>
+  </div>
 
   <main class="layout">
     <!-- Left: the conversation with the agent -->

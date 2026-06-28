@@ -64,6 +64,111 @@ body {
   cursor: not-allowed;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.key-status {
+  font-size: 12px;
+  color: #6ee7a8;
+  white-space: nowrap;
+}
+
+.primary-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-btn:hover {
+  background: var(--accent-hover);
+}
+
+/* ---------- Bring-your-own-key panel ---------- */
+.key-panel {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(8, 9, 12, 0.7);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.key-panel-inner {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 460px;
+  width: 100%;
+}
+
+.key-panel-inner h2 {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.key-panel-inner p {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+
+.key-panel-inner label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+#key-input {
+  width: 100%;
+  background: #0f1115;
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 11px 12px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+#key-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.key-panel-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.key-panel-buttons .spacer {
+  flex: 1;
+}
+
+.key-link {
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.key-link:hover {
+  text-decoration: underline;
+}
+
 .layout {
   display: grid;
   grid-template-columns: 1fr;

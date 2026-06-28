@@ -11,13 +11,96 @@ const downloadBtn = document.getElementById('download-btn');
 const openBtn = document.getElementById('open-btn');
 const newBtn = document.getElementById('new-btn');
 
+// Bring-your-own-key UI
+const keyBtn = document.getElementById('key-btn');
+const keyStatus = document.getElementById('key-status');
+const keyPanel = document.getElementById('key-panel');
+const keyInput = document.getElementById('key-input');
+const keyError = document.getElementById('key-error');
+const keySave = document.getElementById('key-save');
+const keyClear = document.getElementById('key-clear');
+
+const KEY_STORAGE = 'aisb_anthropic_key';
+
 // The full conversation we send to the agent (short text only), plus the
 // latest full HTML it produced — the agent edits the site in place from there.
 let conversation = []; // [{ role: 'user' | 'assistant', content }]
 let latestHtml = '';
 let busy = false;
 
-// --- Example chips (event-delegated so they keep working as the DOM changes) ---
+// ---------------- Bring-your-own-key ----------------
+// The key is kept ONLY in this browser's localStorage. It's sent as a header
+// with each request and used solely to call Anthropic on the visitor's behalf.
+function getKey() {
+  return (localStorage.getItem(KEY_STORAGE) || '').trim();
+}
+
+function hasKey() {
+  return getKey().length > 0;
+}
+
+function looksLikeKey(k) {
+  return /^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k);
+}
+
+function refreshKeyUi() {
+  const set = hasKey();
+  keyStatus.hidden = !set;
+  keyClear.hidden = !set;
+  keyBtn.textContent = set ? 'Change key' : 'API key';
+  // Gate the composer until a key exists.
+  promptInput.disabled = busy || !set;
+  sendBtn.disabled = busy || !set;
+  promptInput.placeholder = set
+    ? 'Describe your website, or ask for a change…'
+    : 'Add your Anthropic API key to start…';
+}
+
+function openKeyPanel() {
+  keyInput.value = getKey();
+  keyError.hidden = true;
+  keyPanel.hidden = false;
+  keyInput.focus();
+}
+
+function closeKeyPanel() {
+  keyPanel.hidden = true;
+}
+
+function saveKey() {
+  const k = keyInput.value.trim();
+  if (!looksLikeKey(k)) {
+    keyError.textContent = 'That doesn’t look like an Anthropic key (they start with "sk-ant-").';
+    keyError.hidden = false;
+    return;
+  }
+  localStorage.setItem(KEY_STORAGE, k);
+  keyError.hidden = true;
+  closeKeyPanel();
+  refreshKeyUi();
+  hideError();
+  promptInput.focus();
+}
+
+function clearKey() {
+  localStorage.removeItem(KEY_STORAGE);
+  keyInput.value = '';
+  refreshKeyUi();
+  closeKeyPanel();
+}
+
+keyBtn.addEventListener('click', openKeyPanel);
+keySave.addEventListener('click', saveKey);
+keyClear.addEventListener('click', clearKey);
+keyInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); saveKey(); }
+});
+// Click the dimmed backdrop (but not the inner card) to dismiss.
+keyPanel.addEventListener('click', (e) => {
+  if (e.target === keyPanel) closeKeyPanel();
+});
+
+// ---------------- Example chips (event-delegated) ----------------
 messagesEl.addEventListener('click', (e) => {
   const chip = e.target.closest('.example-chip');
   if (!chip) return;
@@ -25,7 +108,7 @@ messagesEl.addEventListener('click', (e) => {
   promptInput.focus();
 });
 
-// --- Send on submit / Enter ---
+// ---------------- Send ----------------
 composer.addEventListener('submit', (e) => {
   e.preventDefault();
   send();
@@ -42,6 +125,13 @@ newBtn.addEventListener('click', startOver);
 
 async function send() {
   if (busy) return;
+
+  if (!hasKey()) {
+    showError('Add your Anthropic API key first — it stays in your browser.');
+    openKeyPanel();
+    return;
+  }
+
   const text = promptInput.value.trim();
   if (!text) return;
 
@@ -57,7 +147,10 @@ async function send() {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-anthropic-key': getKey(),
+      },
       body: JSON.stringify({ messages: conversation, currentHtml: latestHtml }),
     });
 
@@ -68,6 +161,10 @@ async function send() {
       // Roll back the user turn so they can edit and retry cleanly.
       conversation.pop();
       showError(data.error || 'Something went wrong.');
+      // If the key was missing or rejected, surface the key panel.
+      if (data.code === 'NO_KEY' || data.code === 'BAD_KEY' || data.code === 'KEY_REJECTED') {
+        openKeyPanel();
+      }
       return;
     }
 
@@ -88,7 +185,7 @@ async function send() {
     showError('Could not reach the server. Is it running?');
   } finally {
     setBusy(false);
-    promptInput.focus();
+    if (hasKey()) promptInput.focus();
   }
 }
 
@@ -115,10 +212,10 @@ function startOver() {
       <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
     </div>`;
   messagesEl.appendChild(intro);
-  promptInput.focus();
+  if (hasKey()) promptInput.focus();
 }
 
-// --- Chat rendering ---
+// ---------------- Chat rendering ----------------
 function addMessage(who, text) {
   const el = document.createElement('div');
   el.className = `msg ${who}`;
@@ -148,7 +245,7 @@ function scrollToBottom() {
   messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
-// --- Preview ---
+// ---------------- Preview ----------------
 function renderPreview(html) {
   previewFrame.style.display = 'block';
   placeholder.style.display = 'none';
@@ -157,11 +254,11 @@ function renderPreview(html) {
   previewFrame.srcdoc = html;
 }
 
-// --- UI state ---
+// ---------------- UI state ----------------
 function setBusy(isBusy) {
   busy = isBusy;
-  sendBtn.disabled = isBusy;
-  promptInput.disabled = isBusy;
+  sendBtn.disabled = isBusy || !hasKey();
+  promptInput.disabled = isBusy || !hasKey();
   btnLabel.textContent = isBusy ? 'Working…' : 'Send';
   previewLoading.hidden = !isBusy;
 }
@@ -175,7 +272,7 @@ function hideError() {
   errorMsg.hidden = true;
 }
 
-// --- Download / open ---
+// ---------------- Download / open ----------------
 downloadBtn.addEventListener('click', () => {
   if (!latestHtml) return;
   const blob = new Blob([latestHtml], { type: 'text/html' });
@@ -197,3 +294,7 @@ openBtn.addEventListener('click', () => {
   // Revoke a little later so the new tab has time to load.
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 });
+
+// ---------------- Boot ----------------
+refreshKeyUi();
+if (!hasKey()) openKeyPanel();
