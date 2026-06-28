@@ -80,6 +80,40 @@ up *your* Anthropic bill:
 > touch your server at all, you'd move the Anthropic call into the browser, at
 > the cost of exposing request internals client-side.
 
+## Deploy it (get a public URL)
+
+The repo ships with deploy configs so you can put it online without extra
+setup. **No API keys to configure** — it's bring-your-own-key, so every visitor
+supplies their own. All these hosts serve over HTTPS by default.
+
+### Render (one-click)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/samshevchuk8-code/Projx)
+
+`render.yaml` is a Render Blueprint, so the button (or **New → Blueprint** in the
+Render dashboard) reads it and provisions everything. It's pinned to the
+`claude/ai-website-builder-w547xb` branch; once that's merged to `main` you can
+drop the `branch:` line.
+
+### Railway
+
+New Project → Deploy from GitHub repo. Railway auto-detects Node and runs
+`npm start` (there's also a `Procfile`). Set the branch to deploy in the
+service settings.
+
+### Fly.io / any container host
+
+A `Dockerfile` is included, so:
+
+```bash
+fly launch        # detects the Dockerfile; accept the defaults
+fly deploy
+```
+
+The same image runs on Google Cloud Run, a VPS, or anything that runs
+containers. Hosts that inject their own `PORT` (Render, Railway, Cloud Run) are
+handled automatically; `server.js` reads `process.env.PORT`.
+
 ## Project structure
 
 ```
@@ -110,9 +144,9 @@ ai-site-builder/
   use *their own* key/credits (BYOK), not yours. There's also a tiny in-memory
   rate limiter (20 requests/minute per IP) in `server.js` as basic abuse
   protection; it resets on restart and won't hold up under real traffic.
-- **No deployment config.** This runs locally. To put it online, deploy the
-  Node app (Render, Railway, Fly.io, a VPS, etc.) over HTTPS. You don't need to
-  set any API key on the server — visitors bring their own.
+- **Deployment is included** (see "Deploy it" above) but kept minimal — a
+  Render Blueprint, a Dockerfile, and a Procfile. No autoscaling, CDN, or
+  custom-domain setup; add those per your host when you need them.
 
 ## Where to go next
 
