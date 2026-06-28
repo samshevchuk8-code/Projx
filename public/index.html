@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Site Builder</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">◆</span>
+      <span>AI Site Builder</span>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="composer">
+      <h1>Describe the website you want</h1>
+      <p class="subtitle">Be as specific as you like — business type, vibe, sections, colors.</p>
+
+      <textarea
+        id="prompt-input"
+        placeholder="e.g. A landing page for a cozy neighborhood coffee shop called &quot;Fern &amp; Bean&quot;. Warm, earthy colors. Hero section, a menu preview, an about section, and a contact form."
+        rows="6"
+      ></textarea>
+
+      <button id="generate-btn">
+        <span id="btn-label">Generate website</span>
+      </button>
+
+      <p id="error-msg" class="error-msg" hidden></p>
+
+      <div class="examples">
+        <span class="examples-label">Try:</span>
+        <button class="example-chip" data-text="A portfolio site for a freelance photographer, dark and moody, with a full-bleed image grid.">Photographer portfolio</button>
+        <button class="example-chip" data-text="A landing page for a SaaS app that helps small teams manage invoices. Clean, modern, blue and white.">SaaS landing page</button>
+        <button class="example-chip" data-text="A one-page site for a local bakery with a menu, hours, and location section. Pastel colors, playful font.">Bakery site</button>
+      </div>
+    </section>
+
+    <section class="preview-pane">
+      <div class="preview-toolbar">
+        <span class="preview-label">Live preview</span>
+        <button id="download-btn" disabled>Download HTML</button>
+      </div>
+      <div id="preview-frame-wrap">
+        <iframe id="preview-frame" title="Generated website preview"></iframe>
+        <div id="placeholder" class="placeholder">
+          <p>Your generated website will appear here.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
