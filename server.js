@@ -204,22 +204,59 @@ app.post('/api/chat', async (req, res) => {
 
     res.json({ reply, html });
   } catch (err) {
-    // Don't log the error verbatim — Anthropic errors can echo request data.
-    // Log only status/name so the visitor's key never lands in your logs.
-    console.error('Claude API error:', err && err.status, err && err.name);
+    // Pull the real reason out of the Anthropic error so the visitor can act on
+    // it, instead of hiding everything behind a generic "failed" message.
+    const status = err && err.status;
+    const apiType = err && err.error && err.error.error && err.error.error.type;
+    const apiMsg = (err && err.error && err.error.error && err.error.error.message) || '';
 
-    if (err && (err.status === 401 || err.status === 403)) {
+    // Log only status/type/message — never the raw error (it can echo request
+    // data) and never the key (it travels in a header, not in these fields).
+    console.error('Claude API error:', status, apiType, apiMsg);
+
+    // Out of credit / billing not set up — the most common first-run failure.
+    if (status === 400 && /credit|billing|too low/i.test(apiMsg)) {
+      return res.status(402).json({
+        error:
+          'Your Anthropic account has no credit. Add billing or claim the free trial credit at ' +
+          'console.anthropic.com (Settings → Billing), then try again.',
+        code: 'NO_CREDIT',
+      });
+    }
+
+    if (status === 401 || status === 403) {
       return res.status(401).json({
-        error: 'Your Anthropic API key was rejected. Check the key and your account credits.',
+        error: 'Your Anthropic API key was rejected. Check that the key is correct and still active.',
         code: 'KEY_REJECTED',
       });
     }
-    if (err && err.status === 429) {
+
+    if (status === 429) {
       return res.status(429).json({
         error: 'Anthropic rate-limited your key. Wait a moment and try again.',
       });
     }
-    res.status(502).json({ error: 'The AI agent failed to respond. Please try again.' });
+
+    if (status === 400) {
+      // Surface the actual validation message rather than a vague failure.
+      return res.status(400).json({
+        error: apiMsg ? `Anthropic rejected the request: ${apiMsg}` : 'The request was invalid.',
+      });
+    }
+
+    if (status === 529 || (status >= 500 && status <= 599)) {
+      return res.status(502).json({
+        error: 'Anthropic is temporarily overloaded. Wait a moment and try again.',
+      });
+    }
+
+    // Unknown failure (often a network/timeout reaching Anthropic). Include any
+    // message we have so it isn't a dead end.
+    res.status(502).json({
+      error: apiMsg
+        ? `The AI agent failed: ${apiMsg}`
+        : 'The AI agent could not reach Anthropic. Check your connection and try again.',
+    });
   }
 });
 
