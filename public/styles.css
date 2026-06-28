@@ -183,13 +183,16 @@ body {
   padding: 20px 24px;
   max-width: 1500px;
   margin: 0 auto;
-  height: calc(100vh - 53px);
 }
 
+/* On desktop the app is a fixed-height two-column shell (each pane scrolls
+   internally). On mobile we let the document flow and scroll normally —
+   pinning the height there clips the stacked panes. */
 @media (min-width: 900px) {
   .layout {
     grid-template-columns: 420px 1fr;
     align-items: stretch;
+    height: calc(100vh - 53px);
   }
 }
 

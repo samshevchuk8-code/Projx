@@ -12,6 +12,11 @@ const PORT = process.env.PORT || 3000;
 // The key is read from a request header, used once, and never stored or logged.
 const MODEL = process.env.MODEL || 'claude-sonnet-4-6';
 
+// Behind a host's load balancer (Render, Railway, Fly, etc.) the client IP
+// arrives in X-Forwarded-For. Trust it so the rate limiter buckets per real
+// visitor instead of lumping everyone under the proxy's single IP.
+app.set('trust proxy', true);
+
 app.use(express.json({ limit: '4mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 

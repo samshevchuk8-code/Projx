@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI Site Builder</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%236c5ce7'/%3E%3Cpath%20d='M16%207l5%209-5%209-5-9z'%20fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -88,7 +89,14 @@
         </div>
       </div>
       <div id="preview-frame-wrap">
-        <iframe id="preview-frame" title="Generated website preview"></iframe>
+        <!-- Sandboxed WITHOUT allow-same-origin on purpose: the generated page's
+             scripts run in an opaque origin, so they can't reach this app's
+             localStorage (where the visitor's API key is kept) or cookies. -->
+        <iframe
+          id="preview-frame"
+          title="Generated website preview"
+          sandbox="allow-scripts allow-popups allow-forms allow-modals"
+        ></iframe>
         <div id="placeholder" class="placeholder">
           <p>Your website will appear here as the agent builds it.</p>
         </div>
